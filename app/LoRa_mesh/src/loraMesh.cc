@@ -57,14 +57,14 @@ void LoraMesh::localRead (uint16_t id) {
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 31) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 31) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -97,14 +97,14 @@ void LoraMesh::writeConfig (uint32_t uid, uint16_t id, uint16_t net) {
 	data[15] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 31) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 31) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -113,10 +113,10 @@ void LoraMesh::writeConfig (uint32_t uid, uint16_t id, uint16_t net) {
 	_net = (data[3] | (data[4] << 8));
 
 	if (id == (data[0] | (data[1] << 8)) && net == (data[3] | (data[4] << 8)) && uid == (data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24)))
-		checkBit(true);
+		_checkBit(true);
 
 	else {
-		checkBit(false);
+		_checkBit(false);
 		db<LoraMesh> (WRN) << "\nWarning: failed writing configurations\n\n";
 	}
 }
@@ -133,14 +133,14 @@ void LoraMesh::setParameters(uint16_t id, uint8_t pot, uint8_t bw, uint8_t sf, u
 	data[9] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 10 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 10) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 10) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -151,10 +151,10 @@ void LoraMesh::setParameters(uint16_t id, uint8_t pot, uint8_t bw, uint8_t sf, u
 	_cr    = data[7];
 
 	if (id == (data[0] | (data[1] << 8)) && pot == data[4] && bw == data[5] && sf == data[6] && cr == data[7])
-		checkBit(true);
+		_checkBit(true);
 
 	else {
-		checkBit(false);
+		_checkBit(false);
 		db<LoraMesh> (WRN) << "\nWarning: failed setting parameters\n\n";
 	}
 }
@@ -171,14 +171,14 @@ void LoraMesh::getParameters() {
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 10) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 10) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -212,14 +212,14 @@ int LoraMesh::traceRoute (uint16_t slave_id, uint16_t* route) {
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART)) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (_command.ready_to_get()) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -249,11 +249,11 @@ void GatewayLoraMesh::sendData(uint16_t id, uint8_t* data, int length) {
 
 	int i = 0;
 
-	UARTCharPutNonBlocking(TRANSPARENT_UART, (id & 0xFF));
-	UARTCharPutNonBlocking(TRANSPARENT_UART, ((id & 0xFF00) >> 8));
+	_transparent.put(id & 0xFF);
+	_transparent.put((id & 0xFF00) >> 8);
 
 	for (i = 0 ; i < length ; i++) {
-		UARTCharPutNonBlocking(TRANSPARENT_UART, data[i]);
+		_transparent.put(data[i]);
 	}
 }
 
@@ -266,7 +266,7 @@ void EndDeviceLoraMesh::sendData(uint16_t id, uint8_t* data, int length) {
 	int i = 0;
 
 	for (i = 0 ; i < length ; i++) {
-		UARTCharPutNonBlocking(TRANSPARENT_UART, data[i]);
+		_transparent.put(data[i]);
 	}
 }
 
@@ -287,14 +287,14 @@ void LoraMesh::loraRemoteRead (uint16_t id, uint16_t* net, uint32_t* uid, uint8_
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 31) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 31) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -319,14 +319,14 @@ uint8_t LoraMesh::loraGetNoise (uint16_t id, uint8_t* min, uint8_t* max) {
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 8) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 8) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -351,14 +351,14 @@ void LoraMesh::loraGetRSSI (uint16_t id, uint16_t* id_receiver, uint8_t* rssi_se
 	data[7] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART) && i < 9) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (i < 9) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -386,14 +386,14 @@ void LoraMesh::loraGenericCommand(uint16_t id, uint8_t command, uint8_t* data_se
 	data[length + 4] = ((crc & 0xFF00) >> 8);
 
 	for (i = 0 ; i < 8 ; i++) {
-		UARTCharPutNonBlocking(COMMAND_UART, data[i]);
+		_command.put(data[i]);
 	}
 	i = 0;
 
-	while(!CharsAvail(COMMAND_UART)){}
-	while(CharsAvail(COMMAND_UART)) {
-		if (CharsAvail(COMMAND_UART)) {
-			data[i] = UARTCharGet(COMMAND_UART);
+	while(!_command.ready_to_get()){}
+	while(_command.ready_to_get()) {
+		if (_command.ready_to_get()) {
+			data[i] = _command.get();
 			i++;
 		}
 	}
@@ -406,12 +406,12 @@ void LoraMesh::loraGenericCommand(uint16_t id, uint8_t command, uint8_t* data_se
 void LoraMesh::loraSendData(uint16_t id, uint8_t* data, int length, int isMaster) {
 	int i = 0;
 	if (isMaster) {
-		UARTCharPutNonBlocking(TRANSPARENT_UART, (id & 0xFF));
-		UARTCharPutNonBlocking(TRANSPARENT_UART, ((id & 0xFF00) >> 8));
+		_transparent.put(id & 0xFF);
+		_transparent.put((id & 0xFF00) >> 8);
 	}
 
 	for (i = 0 ; i < length ; i++) {
-		UARTCharPutNonBlocking(TRANSPARENT_UART, data[i]);
+		_transparent.put(data[i]);
 	}
 }
 */

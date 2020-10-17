@@ -16,11 +16,18 @@ class LoraMesh {
 
 public:
 
-	LoraMesh();		// In each child class, properl initializes class
-					// Must send feedback about all the steps and notify about errors
-					// After that, device should be ready to make any send()
+	LoraMesh() {
+	    // In each child class, properly initializes class
+		// Must send feedback about all the steps and notify about errors
+		// After that, device should be ready to make any send()
 
-	~LoraMesh();	// Destruction of the network must be deeply analysed
+        _transparent = UART(0, 115200, 8, 0, 1); //------------------- 9600
+        _command = UART(1, 115200, 8, 0, 1);
+        _checkBit = true;
+
+	}
+
+	~LoraMesh() {}	// Destruction of the network must be deeply analysed
 					//
 					// Consider:
 					//		1) Removing leaf End Device
@@ -61,6 +68,10 @@ public:
 		return _cr;
 	}
 
+    bool checkBit() {
+		return _checkBit;
+	}
+
 	//FUNCTIONS FROM RADIOENGIE DEVICE
 	uint16_t CRC (uint8_t* data_in, uint32_t length);
 
@@ -68,7 +79,7 @@ public:
 
 	void writeConfig (uint32_t uid, uint16_t id, uint16_t net);
 
-	void setParameters(uint16_t id, uint8_t potencia, uint8_t bw, uint8_t sf, uint8_t cr);
+	void setParameters(uint16_t id, uint8_t pot, uint8_t bw, uint8_t sf, uint8_t cr);
 
 	void getParameters();
 
@@ -89,7 +100,6 @@ public:
 
 private:
 
-	// UART(s)
 	uint32_t _uid;			// unique ID
 	uint16_t _id;			// device's ID
 	uint16_t _net;			// network
@@ -98,17 +108,30 @@ private:
 	uint8_t  _cr;			// coding rate
 	uint8_t  _power;		// power for antenna
 
-	bool	 checkBit;		// true if the last operation went successful.
+	bool	 _checkBit;		// true if the last operation went successful.
 							// Not appliable to: localRead, getParameters.
 
-	const uint16_t BROADCAST_ID = 2047; // Sending to this ID send the command to all the nodes in network
-										// Can be used only by gateway
+	UART _transparent;		// transparent UART (A0/A1): send/receive data
+	UART _command;			// command UART (C3/C4): send/receive configuration data and commands
 
 };
 
 class GatewayLoraMesh : public LoraMesh {
 
 public:
+
+    GatewayLoraMesh(uint16_t net = HYDRO_NET,
+                    uint8_t sf = HYDRO_SF,
+                    uint8_t bw = HYDRO_BW,
+                    uint8_t cr = HYDRO_CR,
+                    uint8_t power = HYDRO_POWER) {
+
+        localRead(MASTER_ID);
+        writeConfig(_uid, MASTER_ID, net);
+        setParameters(MASTER_ID, power, bw, sf, cr);
+    }
+
+    ~GatewayLoraMesh() {}
 
 private:
 
@@ -122,6 +145,19 @@ private:
 class EndDeviceLoraMesh : public LoraMesh {
 
 public:
+    EndDeviceLoraMesh(uint16_t id,
+                    uint16_t net = HYDRO_NET,
+                    uint8_t sf = HYDRO_SF,
+                    uint8_t bw = HYDRO_BW,
+                    uint8_t cr = HYDRO_CR,
+                    uint8_t power = HYDRO_POWER) {
+
+        localRead(id);
+        writeConfig(_uid, id, net);
+        setParameters(id, power, bw, sf, cr);
+    }
+
+    ~EndDeviceLoraMesh() {}
 
 private:
 

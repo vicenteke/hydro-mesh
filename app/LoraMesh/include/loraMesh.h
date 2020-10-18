@@ -1,14 +1,19 @@
+#ifndef _LORAMESH_H
+#define _LORAMESH_H
+
 #include <machine.h>
 #include <alarm.h>
 #include <gpio.h>
 #include <utility/ostream.h>
 #include <uart.h>
 #include <gpio.h>
-#include <machine/cortex_m/emote3_gptm.h>
-#include <machine/cortex_m/emote3_gprs.h>
+// #include <machine/cortex_m/emote3_gptm.h>
+// #include <machine/cortex_m/emote3_gprs.h>
 
 #include <cstdint>
-#include <vector>
+// #include <vector>
+
+#include "defines.h"
 
 using namespace EPOS;
 
@@ -21,8 +26,12 @@ public:
 		// Must send feedback about all the steps and notify about errors
 		// After that, device should be ready to make any send()
 
-        _transparent = UART(0, 115200, 8, 0, 1); //------------------- 9600
-        _command = UART(1, 115200, 8, 0, 1);
+        _transparent = UART(0, 9600, 8, 0, 1); //------------------- 9600
+        _command = UART(1, 9600, 8, 0, 1);
+
+        _transparent.loopback(false);
+        _command.loopback(false);
+
         _checkBit = true;
 
 	}
@@ -60,8 +69,8 @@ public:
 		return _bw;
 	}
 
-	uint8_t potencia() {
-		return _potencia;
+	uint8_t power() {
+		return _power;
 	}
 
 	uint8_t cr() {
@@ -71,6 +80,10 @@ public:
     bool checkBit() {
 		return _checkBit;
 	}
+
+    void checkBit(bool b) {
+        _checkBit = b;
+    }
 
 	//FUNCTIONS FROM RADIOENGIE DEVICE
 	uint16_t CRC (uint8_t* data_in, uint32_t length);
@@ -85,7 +98,7 @@ public:
 
 	int traceRoute(uint16_t slave_id, uint16_t* route); //Returns number of hops
 
-	virtual void send(uint16_t id, uint8_t* data, int length) = 0;
+	//virtual void send(uint16_t id, uint8_t* data, int length) = 0;
 
 	//virtual void keepReceiving() = 0; 	// Create parallel thread to keep receiving messages?
 										// Only if UART interrupts are not available
@@ -98,7 +111,7 @@ public:
 	// void loraGetRSSI (uint16_t id, uint16_t* id_receiver, uint8_t* rssi_send, uint8_t* rssi_receive);
 	// void loraGenericCommand(uint16_t id, uint8_t command, uint8_t* data_send, uint32_t length, uint8_t* response);
 
-private:
+protected:
 
 	uint32_t _uid;			// unique ID
 	uint16_t _id;			// device's ID
@@ -164,3 +177,5 @@ private:
 	// vector route?
 
 };
+
+#endif

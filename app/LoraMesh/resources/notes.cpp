@@ -1,5 +1,5 @@
-// UART 0: PA0 / PA1
-// UART 1: PC3 / PC4
+// UART 0: PA0 (RX) / PA1 (TX)
+// UART 1: PC3 (RX) / PC4 (TX)
 
 
 #include <machine.h>
@@ -63,7 +63,6 @@ int ping() {
 		uart.put('i');
 		uart.put('n');
 		uart.put('g');
-		uart.put('\n');
 	}
 
 	return 0;

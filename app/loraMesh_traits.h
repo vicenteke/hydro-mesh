@@ -65,26 +65,6 @@ template<> struct Traits<Observers>: public Traits<void>
     static const bool debugged = false;
 };
 
-// Enabling debugging for LoraMesh classes
-class LoraMesh;
-class GatewayLoraMesh;
-class EndDeviceLoraMesh;
-
-template<> struct Traits<LoraMesh>: public Traits<void>
-{
-    static const bool debugged = true;
-};
-
-template<> struct Traits<GatewayLoraMesh>: public Traits<void>
-{
-    static const bool debugged = true;
-};
-
-template<> struct Traits<EndDeviceLoraMesh>: public Traits<void>
-{
-    static const bool debugged = true;
-};
-
 // System Parts (mostly to fine control debugging)
 template<> struct Traits<Boot>: public Traits<void>
 {

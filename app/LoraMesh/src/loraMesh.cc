@@ -16,7 +16,7 @@
 //		MUST implement function to receive message and SEND A RESPONSE
 
 #include "../include/loraMesh.h"
-#include "../include/defines.h"
+// #include "../include/defines.h"
 
 // IMPLEMENTATIONS FOR CLASS LoraMesh
 
@@ -33,7 +33,7 @@ uint16_t LoraMesh::CRC(uint8_t* data_in, uint32_t length) {
 			bitbang = crc_calc;
 			crc_calc >>= 1;
 			if(bitbang & 1) {
-				crc_calc ^= CRC_POLY;
+				crc_calc ^= 0xA001;
 			}
 		}
 	}
@@ -61,7 +61,7 @@ void LoraMesh::localRead (uint16_t id) {
 	}
 	i = 0;
 
-	while(!_command.ready_to_get()){}
+	while(!_command.ready_to_get());
 	while(_command.ready_to_get()) {
 		if (i < 31) {
 			data[i] = _command.get();
@@ -113,10 +113,10 @@ void LoraMesh::writeConfig (uint32_t uid, uint16_t id, uint16_t net) {
 	_net = (data[3] | (data[4] << 8));
 
 	if (id == (data[0] | (data[1] << 8)) && net == (data[3] | (data[4] << 8)) && uid == (data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24)))
-		_checkBit(true);
+		checkBit(true);
 
 	else {
-		_checkBit(false);
+		checkBit(false);
 		db<LoraMesh> (WRN) << "\nWarning: failed writing configurations\n\n";
 	}
 }
@@ -127,7 +127,7 @@ void LoraMesh::setParameters(uint16_t id, uint8_t pot, uint8_t bw, uint8_t sf, u
 	db<LoraMesh> (TRC) << "LoraMesh::setParameters() called\n";
 
 	int i = 0;
-	uint8_t* data = {(id & 0xFF), ((id & 0xFF00) >> 8), MOD_PARAM, 0x01, pot, bw, sf, cr, 0x00, 0x00};
+	uint8_t data[] = {(uint8_t)(id & 0xFF), (uint8_t)((id & 0xFF00) >> 8), MOD_PARAM, 0x01, pot, bw, sf, cr, 0x00, 0x00};
 	uint16_t crc =  CRC(data, 8);
 	data[8] = (crc & 0xFF);
 	data[9] = ((crc & 0xFF00) >> 8);
@@ -151,10 +151,10 @@ void LoraMesh::setParameters(uint16_t id, uint8_t pot, uint8_t bw, uint8_t sf, u
 	_cr    = data[7];
 
 	if (id == (data[0] | (data[1] << 8)) && pot == data[4] && bw == data[5] && sf == data[6] && cr == data[7])
-		_checkBit(true);
+		checkBit(true);
 
 	else {
-		_checkBit(false);
+		checkBit(false);
 		db<LoraMesh> (WRN) << "\nWarning: failed setting parameters\n\n";
 	}
 }
@@ -164,8 +164,8 @@ void LoraMesh::getParameters() {
 	db<LoraMesh> (TRC) << "LoraMesh::getParameters() called\n";
 
 	int i = 0;
-	uint16_t id = id();
-	uint8_t* data = {(id & 0xFF), ((id & 0xFF00) >> 8), MOD_PARAM, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
+	uint16_t id = this->id();
+	uint8_t data[] = {(uint8_t)(id & 0xFF), (uint8_t)((id & 0xFF00) >> 8), MOD_PARAM, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
 	uint16_t crc =  CRC(data, 6);
 	data[6] = (crc & 0xFF);
 	data[7] = ((crc & 0xFF00) >> 8);
@@ -202,7 +202,7 @@ int LoraMesh::traceRoute (uint16_t slave_id, uint16_t* route) {
 
 	int i, j = 3;
 	uint8_t* data;
-	data[0] = (slvae_id & 0xFF);
+	data[0] = (slave_id & 0xFF);
 	data[1] = ((slave_id & 0xFF00) >> 8);
 	data[2] = TRACE_ROUTE;
 	data[3] = data[4] = data[5] = 0x00;
@@ -224,7 +224,7 @@ int LoraMesh::traceRoute (uint16_t slave_id, uint16_t* route) {
 		}
 	}
 
-	db<LoraMesh> (INF) << "\nRout traced for ID " << slvae_id << ": ";
+	db<LoraMesh> (INF) << "\nRout traced for ID " << slave_id << ": ";
 
 	while (j < i) {
 		if (j % 2) {
@@ -243,7 +243,7 @@ int LoraMesh::traceRoute (uint16_t slave_id, uint16_t* route) {
 
 // IMPLEMENTATIONS FOR CLASS GatewayLoraMesh
 
-void GatewayLoraMesh::sendData(uint16_t id, uint8_t* data, int length) {
+/*void GatewayLoraMesh::sendData(uint16_t id, uint8_t* data, int length) {
 
 	db<LoraMesh> (TRC) << "GatewayLoraMesh::sendData() called\n";
 
@@ -268,7 +268,7 @@ void EndDeviceLoraMesh::sendData(uint16_t id, uint8_t* data, int length) {
 	for (i = 0 ; i < length ; i++) {
 		_transparent.put(data[i]);
 	}
-}
+}*/
 
 //Drafts for other functions
 /*

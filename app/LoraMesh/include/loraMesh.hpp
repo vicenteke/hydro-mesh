@@ -20,17 +20,16 @@ using namespace EPOS;
 class LoraMesh {
 
 public:
-
 	LoraMesh() {
 	    // In each child class, properly initializes class
 		// Must send feedback about all the steps and notify about errors
 		// After that, device should be ready to make any send()
 
-        _transparent = UART(0, 9600, 8, 0, 1); //------------------- 9600
-        _command = UART(1, 9600, 8, 0, 1);
+        _transparent = UART(1, 9600, 8, 0, 1);
+        // _command = UART(0, 9600, 8, 0, 1);
 
         _transparent.loopback(false);
-        _command.loopback(false);
+        // _command.loopback(false);
 
         _checkBit = true;
 
@@ -88,7 +87,7 @@ public:
 	//FUNCTIONS FROM RADIOENGIE DEVICE
 	uint16_t CRC (uint8_t* data_in, uint32_t length);
 
-	void localRead (uint16_t id);
+	void localRead ();
 
 	void writeConfig (uint32_t uid, uint16_t id, uint16_t net);
 
@@ -127,6 +126,8 @@ protected:
 	UART _transparent;		// transparent UART (A0/A1): send/receive data
 	UART _command;			// command UART (C3/C4): send/receive configuration data and commands
 
+    OStream cout;
+
 };
 
 class GatewayLoraMesh : public LoraMesh {
@@ -139,9 +140,9 @@ public:
                     uint8_t cr = HYDRO_CR,
                     uint8_t power = HYDRO_POWER) {
 
-        localRead(MASTER_ID);
-        writeConfig(_uid, MASTER_ID, net);
-        setParameters(MASTER_ID, power, bw, sf, cr);
+        localRead();
+        // writeConfig(_uid, MASTER_ID, net);
+        // setParameters(MASTER_ID, power, bw, sf, cr);
     }
 
     ~GatewayLoraMesh() {}
@@ -165,7 +166,7 @@ public:
                     uint8_t cr = HYDRO_CR,
                     uint8_t power = HYDRO_POWER) {
 
-        localRead(id);
+        localRead();
         writeConfig(_uid, id, net);
         setParameters(id, power, bw, sf, cr);
     }
@@ -220,15 +221,18 @@ uint16_t LoraMesh::CRC(uint8_t* data_in, uint32_t length) {
 	return crc_calc;
 }
 
-void LoraMesh::localRead (uint16_t id) {
+void LoraMesh::localRead () {
 	//It is possible to get more information, those are the main and possibly necessary
 
 	db<LoraMesh> (TRC) << "LoraMesh::localRead() called\n";
+	cout << "LoraMesh::localRead() called\n";
 
 	int i = 0;
 	uint8_t* data;
-	data[0] = (id & 0xFF);
-	data[1] = ((id & 0xFF00) >> 8);
+	// data[0] = (id & 0xFF);
+	// data[1] = ((id & 0x0300) >> 8);
+	data[0] = 0xFF;
+	data[1] = 0x03;
 	data[2] = LOCAL_READ;
 	data[3] = data[4] = data[5] = 0x00;
 
@@ -240,18 +244,19 @@ void LoraMesh::localRead (uint16_t id) {
 		_command.put(data[i]);
 	}
 	i = 0;
-
+    cout << "put\n";
 	while(!_command.ready_to_get());
+    cout << "ready\n";
 	while(_command.ready_to_get()) {
-		if (i < 31) {
+		if (i++ < 31) {
 			data[i] = _command.get();
-			i++;
 		}
 	}
 
+    _id  = (uint16_t)(data[0] | (data[1] << 8));
 	_net = (uint16_t)(data[3] | (data[4] << 8));
 	_uid = (uint32_t)(data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24));
-	_sf = data[15];
+	_sf  = data[15];
 }
 
 void LoraMesh::writeConfig (uint32_t uid, uint16_t id, uint16_t net) {

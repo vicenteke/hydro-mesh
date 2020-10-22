@@ -2,6 +2,7 @@
 #define __traits_h
 
 #include <system/config.h>
+// #include "LoraMesh/include/loraMesh.hpp"
 
 __BEGIN_SYS
 
@@ -42,6 +43,11 @@ template<> struct Traits<Debug>
     static const bool info    = false;
     static const bool trace   = false;
 };
+
+// For LoRa MESH
+// template<> struct Traits<LoraMesh>: public Traits<void>
+// {
+// };
 
 template<> struct Traits<Lists>: public Traits<void>
 {

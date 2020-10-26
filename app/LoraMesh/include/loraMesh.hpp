@@ -151,6 +151,7 @@ public:
     void sendToAll(char* data);
     void receiver();
     void stopReceiver();
+    static void uartHandler(const unsigned int &);
 
 private:
 
@@ -197,7 +198,7 @@ private:
 void GatewayLoraMesh::send(uint16_t id, char* data) {
 // Sends data to node defined by "id"
 
-	db<LoraMesh> (TRC) << "GatewayLoraMesh::sendData() called\n";
+	db<Lora> (WRN) << "GatewayLoraMesh::sendData() called\n";
 
 	_transparent.put(id & 0xFF);
 	_transparent.put((id >> 8) & 0xFF);
@@ -213,15 +214,52 @@ void GatewayLoraMesh::sendToAll(char* data) {
     send(BROADCAST_ID, data);
 }
 
+void GatewayLoraMesh::uartHandler(const unsigned int &) {
+    cout << "[UART Handler] ";
+
+    char str[30];
+    str[0] = '\0';
+
+    int len = 0;
+    char buf = '0';
+    int id[] = {10, 10};
+
+    // while (!_transparent.ready_to_get());
+    id[1] = _transparent.get();
+    id[0] = _transparent.get();
+    Alarm::delay((int)(6000));
+    while(_transparent.ready_to_get() && len <= 30) {
+        buf = _transparent.get();
+        str[len++] = buf;
+        Alarm::delay((int)(500)); // 500 for 115200
+    }
+
+    str[len] = '\0';
+
+    cout << "Received from " << ((id[0] << 8) + id[1]) << ": " << str << '\n';
+    // cout << "Received from " << (char)(id[0]/10 + '0') << (char)(id[0]%10 + '0')
+    //     << (char)(id[1]/10 + '0') << (char)(id[1]%10 + '0') << ": " << str << '\n';
+
+    str[0] = '\0';
+    len = 0;
+    id[0] = id[1] = 10;
+}
+
 void GatewayLoraMesh::receiver() {
 // Creates receiver thread
 
     cout << "Gateway started waiting for messages\n";
 
     _receiver = new Thread(&keepReceiving);
-    int status_receiver = _receiver->join();
+    // int status_receiver = _receiver->join();
 
+    // _transparent.int_disable();
+	// IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
+	// _transparent.int_enable();
+    // IC::enable(NVIC::IRQ_UART1);
+    // CPU::int_enable();
 }
+
 void GatewayLoraMesh::stopReceiver() {
 // Kills receiver thread
 
@@ -234,7 +272,7 @@ void GatewayLoraMesh::stopReceiver() {
 int GatewayLoraMesh::keepReceiving() {
 // Creates a loop to check UART
 
-    db<LoraMesh> (TRC) << "GatewayLoraMesh::keepReceiving() called\n";
+    db<Lora> (WRN) << "GatewayLoraMesh::keepReceiving() called\n";
 
     char str[30];
     str[0] = '\0';
@@ -256,8 +294,9 @@ int GatewayLoraMesh::keepReceiving() {
 
         str[len] = '\0';
 
-        cout << "Received from " << (char)(id[0]/10 + '0') << (char)(id[0]%10 + '0')
-            << (char)(id[1]/10 + '0') << (char)(id[1]%10 + '0') << ": " << str << '\n';
+        cout << "Received from " << ((id[0] << 8) + id[1]) << ": " << str << '\n';
+        // cout << "Received from " << (char)(id[0]/10 + '0') << (char)(id[0]%10 + '0')
+        //     << (char)(id[1]/10 + '0') << (char)(id[1]%10 + '0') << ": " << str << '\n';
 
         str[0] = '\0';
         len = 0;
@@ -272,7 +311,7 @@ int GatewayLoraMesh::keepReceiving() {
 void EndDeviceLoraMesh::send(char* data) {
 // Sends data to gateway
 
-	db<LoraMesh> (TRC) << "EndDeviceLoraMesh::sendData() called\n";
+	db<Lora> (WRN) << "EndDeviceLoraMesh::sendData() called\n";
 
 	for (int i = 0 ; i < strlen(data) ; i++) {
 		_transparent.put(data[i]);
@@ -300,7 +339,7 @@ void EndDeviceLoraMesh::stopReceiver() {
 int EndDeviceLoraMesh::keepReceiving() {
 // Creates a loop to check UART
 
-    db<LoraMesh> (TRC) << "EndDeviceLoraMesh::keepReceiving() called\n";
+    db<Lora> (WRN) << "EndDeviceLoraMesh::keepReceiving() called\n";
 
     char str[30];
     str[0] = '\0';
@@ -313,7 +352,7 @@ int EndDeviceLoraMesh::keepReceiving() {
         while(_transparent.ready_to_get() && len <= 30) {
             buf = _transparent.get();
             str[len++] = buf;
-            Alarm::delay((int)(500)); // 500 for 115200
+            Alarm::delay((int)(3000)); // 500 for 115200
         }
 
         str[len] = '\0';

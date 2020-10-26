@@ -2,7 +2,6 @@
 #define __traits_h
 
 #include <system/config.h>
-// #include "LoraMesh/include/loraMesh.hpp"
 
 __BEGIN_SYS
 
@@ -45,9 +44,11 @@ template<> struct Traits<Debug>
 };
 
 // For LoRa MESH
-// template<> struct Traits<LoraMesh>: public Traits<void>
-// {
-// };
+class Lora;
+template<> struct Traits<Lora>: public Traits<void>
+{
+    static const bool debugged = false;
+};
 
 template<> struct Traits<Lists>: public Traits<void>
 {

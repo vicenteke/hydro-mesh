@@ -20,47 +20,37 @@ using namespace EPOS;
 OStream cout;
 OStream LoraMesh::cout;
 UART LoraMesh::_transparent;
+// void GatewayLoraMesh::uartHandler(const unsigned int &);
 
 UART uart(1, 9600, 8, 0, 1);
-
-int pingUART() {
-
-    char str[] = "123456789";
-    int len = 9; // No problems with len = 9 in same eMote. Problems with 10 after five/six messages.
-                 // Some problems with 2 eMotes actually.
-
-    while (1) {
-        Alarm::delay(2000000);
-        // str[len++] = (char)(len + 'a');
-        // str[len]   = '\0';
-        for (int j = 0 ; j < len ; j++) {
-            uart.put(str[j]);
-        }
-        // cout << "put " << str << "\n";
-    }
-
-    return 0;
-}
 
 int main()
 {
 	Alarm::delay(2000000); //Necessary to use minicom
 
-    // cout << "------------ LoRa Mesh Program: Gateway ------------\n";
+    cout << "------------ LoRa Mesh Program: Gateway ------------\n";
+
+	GatewayLoraMesh gateway = GatewayLoraMesh();
+
+    char str[] = "pong";
+
+    while (1) {
+        gateway.sendToAll(str);
+        // gateway.send(1, str);
+        Alarm::delay(4000000);
+    }
+
+    // cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
     //
-	// GatewayLoraMesh gateway = GatewayLoraMesh();
-
-    cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
-
-	EndDeviceLoraMesh endDevice = EndDeviceLoraMesh(1);
-    endDevice.stopReceiver();
-
-    char str[] = "ping";
-
-	while (1) {
-        Alarm::delay(3000000);
-        endDevice.send(str);
-	}
+	// EndDeviceLoraMesh endDevice = EndDeviceLoraMesh(2);
+    // // endDevice.stopReceiver();
+    //
+    // char str[] = "pang";
+    //
+	// while (1) {
+    //     endDevice.send(str);
+    //     Alarm::delay(8000000);
+	// }
 
     return 0;
 }

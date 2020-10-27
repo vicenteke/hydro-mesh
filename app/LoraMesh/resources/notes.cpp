@@ -1,6 +1,13 @@
 // UART 0: PA0 (RX) / PA1 (TX)
 // UART 1: PC3 (RX) / PC4 (TX)
 
+// 7024: master ; 7109: ID 1 ; 7222: ID 2
+
+// Message sent by station:
+    // General:
+        // msg[15] = name[5] (w/ \0) + timestamp[4] + level[2] + tur[2] + plu + signal
+    // Other: no name, msg[10]
+
 
 #include <machine.h>
 #include <alarm.h>

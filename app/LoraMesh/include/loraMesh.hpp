@@ -122,15 +122,21 @@ protected:
 
 };
 
+OStream LoraMesh::cout;
+UART LoraMesh::_transparent;
+
 class GatewayLoraMesh : public LoraMesh {
 
 public:
 
-    GatewayLoraMesh(uint16_t net = HYDRO_NET,
+    GatewayLoraMesh(void (*handler)(int, char *) = &printMessage,
+                    uint16_t net = HYDRO_NET,
                     uint8_t sf = HYDRO_SF,
                     uint8_t bw = HYDRO_BW,
                     uint8_t cr = HYDRO_CR,
                     uint8_t power = HYDRO_POWER) {
+
+    // handler: handler for messages. Receives ID and the message as parameters
 
         _id = MASTER_ID;
 
@@ -140,7 +146,7 @@ public:
         _cr     = cr;
         _power  = power;
 
-        receiver();
+        receiver(handler);
     }
 
     ~GatewayLoraMesh() {
@@ -149,25 +155,29 @@ public:
 
     void send(uint16_t id, char* data);
     void sendToAll(char* data);
-    void receiver();
+    void receiver(void (*handler)(int, char *) = &printMessage);
     void stopReceiver();
     static void uartHandler(const unsigned int &);
+    static void printMessage(int, char *);
 
 private:
 
     Thread * _receiver;
-    static int keepReceiving();
+    static int keepReceiving(void (*handler)(int, char *));
 };
 
 class EndDeviceLoraMesh : public LoraMesh {
 
 public:
     EndDeviceLoraMesh(uint16_t id,
+                    void (*handler)(char *) = &printMessage,
                     uint16_t net = HYDRO_NET,
                     uint8_t sf = HYDRO_SF,
                     uint8_t bw = HYDRO_BW,
                     uint8_t cr = HYDRO_CR,
                     uint8_t power = HYDRO_POWER) {
+
+        // handler: handler for messages from gateway. Receives message as parameter
 
         _id = id;
         _net    = net;
@@ -176,7 +186,7 @@ public:
         _cr     = cr;
         _power  = power;
 
-        receiver();
+        receiver(handler);
     }
 
     ~EndDeviceLoraMesh() {
@@ -184,13 +194,14 @@ public:
     }
 
     void send(char* data);
-    void receiver();
+    void receiver(void (*handler)(char *) = &printMessage);
     void stopReceiver();
+    static void printMessage(char *);
 
 private:
 
     Thread * _receiver;
-    static int keepReceiving();
+    static int keepReceiving(void (*handler)(char *));
 };
 
 // IMPLEMENTATIONS FOR CLASS GatewayLoraMesh
@@ -245,17 +256,18 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
     id[0] = id[1] = 10;
 }
 
-void GatewayLoraMesh::receiver() {
-// Creates receiver thread
+void GatewayLoraMesh::receiver(void (*handler)(int, char *)) {
+// Creates receiver Thread
+// handler: handler for messages. Receives ID and the message as parameters
 
     cout << "Gateway started waiting for messages\n";
 
-    _receiver = new Thread(&keepReceiving);
+    _receiver = new Thread(&keepReceiving, handler);
     // int status_receiver = _receiver->join();
 
     // _transparent.int_disable();
-	// IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
-	// _transparent.int_enable();
+    // IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
+    // _transparent.int_enable();
     // IC::enable(NVIC::IRQ_UART1);
     // CPU::int_enable();
 }
@@ -269,11 +281,18 @@ void GatewayLoraMesh::stopReceiver() {
         delete _receiver;
 }
 
-int GatewayLoraMesh::keepReceiving() {
-// Creates a loop to check UART
+void GatewayLoraMesh::printMessage(int id, char * msg) {
+
+    cout << "Received from " << id << ": " << msg << '\n';
+}
+
+int GatewayLoraMesh::keepReceiving(void (*handler)(int, char *)) {
+// Creates loop to look for incoming messages
+// Messages received are sent for handler
 
     db<Lora> (WRN) << "GatewayLoraMesh::keepReceiving() called\n";
 
+    // char str[18];
     char str[30];
     str[0] = '\0';
 
@@ -285,18 +304,17 @@ int GatewayLoraMesh::keepReceiving() {
         while (!_transparent.ready_to_get());
         id[1] = _transparent.get();
         id[0] = _transparent.get();
-        Alarm::delay((int)(6000));
-        while(_transparent.ready_to_get() && len <= 30) {
+        Alarm::delay((int)(1500));
+        // while(len < 15) {
+        while(_transparent.ready_to_get() && len < 30) {
             buf = _transparent.get();
             str[len++] = buf;
-            Alarm::delay((int)(500)); // 500 for 115200
+            Alarm::delay((int)(1500)); // 1500 almost fine for SF 12, BW 500, Pot 20
         }
 
         str[len] = '\0';
 
-        cout << "Received from " << ((id[0] << 8) + id[1]) << ": " << str << '\n';
-        // cout << "Received from " << (char)(id[0]/10 + '0') << (char)(id[0]%10 + '0')
-        //     << (char)(id[1]/10 + '0') << (char)(id[1]%10 + '0') << ": " << str << '\n';
+        handler(((id[0] << 8) + id[1]), str);
 
         str[0] = '\0';
         len = 0;
@@ -318,12 +336,12 @@ void EndDeviceLoraMesh::send(char* data) {
 	}
 }
 
-void EndDeviceLoraMesh::receiver() {
+void EndDeviceLoraMesh::receiver(void (*handler)(char *)) {
 // Creates receiver thread
 
     cout << "End Device " << id() << " started waiting for messages\n";
 
-    _receiver = new Thread(&keepReceiving);
+    _receiver = new Thread(&keepReceiving, handler);
     // int status_receiver = _receiver->join();
 
 }
@@ -336,7 +354,7 @@ void EndDeviceLoraMesh::stopReceiver() {
         delete _receiver;
 }
 
-int EndDeviceLoraMesh::keepReceiving() {
+int EndDeviceLoraMesh::keepReceiving(void (*handler)(char *)) {
 // Creates a loop to check UART
 
     db<Lora> (WRN) << "EndDeviceLoraMesh::keepReceiving() called\n";
@@ -352,18 +370,23 @@ int EndDeviceLoraMesh::keepReceiving() {
         while(_transparent.ready_to_get() && len <= 30) {
             buf = _transparent.get();
             str[len++] = buf;
-            Alarm::delay((int)(3000)); // 500 for 115200
+            Alarm::delay((int)(3000));
         }
 
         str[len] = '\0';
 
-        cout << "> " << str << '\n';
+        handler(str);
 
         str[0] = '\0';
         len = 0;
     }
 
     return 0;
+}
+
+void EndDeviceLoraMesh::printMessage(char * msg) {
+
+    cout << "> " << msg << '\n';
 }
 
 #endif

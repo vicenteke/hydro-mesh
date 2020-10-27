@@ -18,12 +18,12 @@
                                 // Can be used only by gateway
 
 // Configurations for HYDRO_MESH
-#define HYDRO_NET        0  // Any value from 0 to 2047
+#define HYDRO_NET        1562  // Any value from 0 to 2047
 
-#define HYDRO_SF         7  // Ranges from 7 to 12 for SF
+#define HYDRO_SF         12  // Ranges from 7 to 12 for SF
                             // or 5 = FSK
 
-#define HYDRO_BW         0  // 0 = 125kHz
+#define HYDRO_BW         2  // 0 = 125kHz
                             // 1 = 250kHz
                             // 2 = 500kHz
 
@@ -32,6 +32,6 @@
                             // 3 = 4/7
                             // 4 = 4/8
 
-#define HYDRO_POWER      15 // Ranges from 0 to 20 dBm
+#define HYDRO_POWER      20 // Ranges from 0 to 20 dBm
 
 #endif

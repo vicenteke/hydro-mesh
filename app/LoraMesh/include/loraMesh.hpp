@@ -146,7 +146,11 @@ public:
         _cr     = cr;
         _power  = power;
 
-        receiver(handler);
+        // receiver(handler);
+        // // if (!_receiver)
+        // //     keepReceiving(handler);
+
+        uartConfig();
     }
 
     ~GatewayLoraMesh() {
@@ -164,6 +168,7 @@ private:
 
     Thread * _receiver;
     static int keepReceiving(void (*handler)(int, char *));
+    void uartConfig();
 };
 
 class EndDeviceLoraMesh : public LoraMesh {
@@ -256,6 +261,27 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
     id[0] = id[1] = 10;
 }
 
+void GatewayLoraMesh::uartConfig() {
+    // IRQ_UART1
+	// IC ic = IC();
+	// ic.int_vector(NVIC::IRQ_UART0, &uartHandler);
+	// ic.enable(NVIC::IRQ_UART0);
+    // IC::disable();
+    // IC::disable(NVIC::IRQ_UART1);
+	// _transparent.int_disable();
+
+	IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
+    NVIC::enable(NVIC::IRQ_UART1);
+    IC::enable(NVIC::IRQ_UART1);
+	_transparent.int_enable();
+    IC::enable();
+
+    // NVIC::enable();
+    // if (CPU::int_disabled()) CPU::int_enable();
+
+    cout << "UART CONFIGURED\n";
+}
+
 void GatewayLoraMesh::receiver(void (*handler)(int, char *)) {
 // Creates receiver Thread
 // handler: handler for messages. Receives ID and the message as parameters
@@ -304,12 +330,12 @@ int GatewayLoraMesh::keepReceiving(void (*handler)(int, char *)) {
         while (!_transparent.ready_to_get());
         id[1] = _transparent.get();
         id[0] = _transparent.get();
-        Alarm::delay((int)(1500));
+        Alarm::delay((int)(6000));
         // while(len < 15) {
         while(_transparent.ready_to_get() && len < 30) {
             buf = _transparent.get();
             str[len++] = buf;
-            Alarm::delay((int)(1500)); // 1500 almost fine for SF 12, BW 500, Pot 20
+            Alarm::delay((int)(3500)); // 1500 almost fine for SF 12, BW 500, Pot 20
         }
 
         str[len] = '\0';

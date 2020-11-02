@@ -3,8 +3,12 @@
 #ifndef __cortex_uart_h__
 #define __cortex_uart_h__
 
+// Everything marked with or within "//---" has been added to implement UART interrupts
+
+// #include <gpio.h> //---
 #include <cpu.h>
 #include <uart.h>
+// #include <utility/handler.h> //---
 #include __MODEL_H
 
 __BEGIN_SYS
@@ -188,7 +192,7 @@ public:
 
 public:
     UART_Engine(unsigned int unit, unsigned int baud_rate, unsigned int data_bits, unsigned int parity, unsigned int stop_bits)
-    : _base(reinterpret_cast<Log_Addr *>(unit ? UART1_BASE : UART0_BASE)) {
+    : _base(reinterpret_cast<Log_Addr *>(unit ? UART1_BASE : UART0_BASE)){
         assert(unit < UNITS);
         config(baud_rate, data_bits, parity, stop_bits);
     }
@@ -249,6 +253,8 @@ public:
 
     bool busy() { return (reg(FR) & BUSY); }
 
+    void clear_int() { reg(ICR) = ~0; } //---
+
 private:
     volatile Reg32 & reg(unsigned int o) { return reinterpret_cast<volatile Reg32*>(_base)[o / sizeof(Reg32)]; }
 
@@ -271,7 +277,18 @@ private:
 
 public:
     UART(unsigned int unit = UNIT, unsigned int baud_rate = BAUD_RATE, unsigned int data_bits = DATA_BITS, unsigned int parity = PARITY, unsigned int stop_bits = STOP_BITS)
-    : Engine((enable_uart(unit), unit), baud_rate, data_bits, parity, stop_bits), _unit(unit) {}
+    : Engine((enable_uart(unit), unit), baud_rate, data_bits, parity, stop_bits), _unit(unit)
+    // , _interrupt('C', 3, GPIO::IN)
+    {
+
+        //---
+        /*if (unit == UART1_BASE) {
+            _interrupt = GPIO('C', 3, GPIO::IN);
+        } else if (unit == UART0_BASE) {
+            _interrupt = GPIO('A', 0, GPIO::IN);
+        }*/
+        //---
+    }
 
     void config(unsigned int baud_rate, unsigned int data_bits, unsigned int parity, unsigned int stop_bits) {
         Engine::config(baud_rate, data_bits, parity, stop_bits);
@@ -288,8 +305,23 @@ public:
     bool ready_to_get() { return rxd_ok(); }
     bool ready_to_put() { return txd_ok(); }
 
+    //---
+    /*void interrupt(const IC::Interrupt_Handler & handler)
+    {
+        _interrupt.handler(handler, GPIO::FALLING);
+    }*/
+    //---
+
     void int_enable(bool receive = true, bool send = true, bool line = true, bool modem = true) {
+        // const IC::Interrupt_Handler & handler = 0,
         Engine::int_enable(receive, send, line, modem);
+
+        //---
+        // if (handler)
+        //     interrupt(handler);
+        // IC::int_vector(_unit, interrupt_handler);
+        // IC::enable(id);
+        //---
     }
     void int_disable(bool receive = true, bool send = true, bool line = true, bool modem = true) {
         Engine::int_disable(receive, send, line, modem);
@@ -300,8 +332,11 @@ public:
 
     void power(const Power_Mode & mode) { power_uart(_unit, mode); }
 
+    void clear_int() { Engine::clear_int(); }
+
 private:
     unsigned int _unit;
+    // GPIO _interrupt; //---
 };
 
 __END_SYS

@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <utility/string.h>
 
+#include <utility/handler.h>
+
 #include "LoraMesh/include/loraMesh.hpp"
 // #include "LoraMesh/include/loraMesh.h"
 
@@ -30,6 +32,8 @@ int main()
     cout << "------------ LoRa Mesh Program: Gateway ------------\n";
 
 	GatewayLoraMesh gateway = GatewayLoraMesh(&justAnotherPrint);
+    // GPIO _interrupt('C', 3, GPIO::IN);
+    // _interrupt.handler(GatewayLoraMesh::uartHandler, GPIO::FALLING);
 	// GatewayLoraMesh gateway = GatewayLoraMesh();
 
     // char str[] = "GW ON";

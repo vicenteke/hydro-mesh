@@ -149,7 +149,7 @@ public:
         // receiver(handler);
         // // if (!_receiver)
         // //     keepReceiving(handler);
-
+        _interrupt.handler(uartHandler, GPIO::FALLING);
         uartConfig();
     }
 
@@ -169,7 +169,10 @@ private:
     Thread * _receiver;
     static int keepReceiving(void (*handler)(int, char *));
     void uartConfig();
+    static GPIO _interrupt;
 };
+
+GPIO GatewayLoraMesh::_interrupt('C', 3, GPIO::IN);
 
 class EndDeviceLoraMesh : public LoraMesh {
 
@@ -233,6 +236,8 @@ void GatewayLoraMesh::sendToAll(char* data) {
 void GatewayLoraMesh::uartHandler(const unsigned int &) {
     cout << "[UART Handler] ";
 
+    _interrupt.int_disable();
+
     char str[30];
     str[0] = '\0';
 
@@ -240,14 +245,21 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
     char buf = '0';
     int id[] = {10, 10};
 
-    // while (!_transparent.ready_to_get());
+    while (!_transparent.ready_to_get());
     id[1] = _transparent.get();
     id[0] = _transparent.get();
-    Alarm::delay((int)(6000));
+    // Alarm::delay((int)(3500));
+    int i = 0;
+    while (!_transparent.ready_to_get());
+    // cout << '1';
     while(_transparent.ready_to_get() && len <= 30) {
+        // cout << '2';
         buf = _transparent.get();
         str[len++] = buf;
-        Alarm::delay((int)(500)); // 500 for 115200
+        // cout << buf;
+        // Alarm::delay((int)(3500)); // 500 for 115200
+        i = 0;
+        while (!_transparent.ready_to_get() && i++ < 80000);
     }
 
     str[len] = '\0';
@@ -259,6 +271,8 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
     str[0] = '\0';
     len = 0;
     id[0] = id[1] = 10;
+    _transparent.clear_int();
+    _interrupt.int_enable();
 }
 
 void GatewayLoraMesh::uartConfig() {
@@ -270,11 +284,17 @@ void GatewayLoraMesh::uartConfig() {
     // IC::disable(NVIC::IRQ_UART1);
 	// _transparent.int_disable();
 
-	IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
-    NVIC::enable(NVIC::IRQ_UART1);
-    IC::enable(NVIC::IRQ_UART1);
+	// IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
+    // NVIC::enable(NVIC::IRQ_UART1);
+    // IC::enable(NVIC::IRQ_UART1);
+
+
+    // _interrupt = GPIO('C', 3, GPIO::IN);
+    // _interrupt.handler(uartHandler, GPIO::FALLING);
 	_transparent.int_enable();
-    IC::enable();
+    // IC::enable();
+
+    // _transparent.int_enable(&uartHandler, true, false, true, true);
 
     // NVIC::enable();
     // if (CPU::int_disabled()) CPU::int_enable();

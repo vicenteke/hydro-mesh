@@ -122,6 +122,7 @@ protected:
 
 };
 
+// Declaring LoraMesh static members
 OStream LoraMesh::cout;
 UART LoraMesh::_transparent;
 
@@ -129,7 +130,7 @@ class GatewayLoraMesh : public LoraMesh {
 
 public:
 
-    GatewayLoraMesh(void (*handler)(int, char *) = &printMessage,
+    GatewayLoraMesh(void (*hand)(int, char *) = &printMessage,
                     uint16_t net = HYDRO_NET,
                     uint8_t sf = HYDRO_SF,
                     uint8_t bw = HYDRO_BW,
@@ -146,11 +147,10 @@ public:
         _cr     = cr;
         _power  = power;
 
-        // receiver(handler);
-        // // if (!_receiver)
-        // //     keepReceiving(handler);
+        // Initializing interrupts
+        _handler = hand;
         _interrupt.handler(uartHandler, GPIO::FALLING);
-        uartConfig();
+        receiver();
     }
 
     ~GatewayLoraMesh() {
@@ -159,20 +159,19 @@ public:
 
     void send(uint16_t id, char* data);
     void sendToAll(char* data);
-    void receiver(void (*handler)(int, char *) = &printMessage);
+    void receiver(void (*hand)(int, char *) = _handler ? _handler : &printMessage);
     void stopReceiver();
-    static void uartHandler(const unsigned int &);
     static void printMessage(int, char *);
 
 private:
-
-    Thread * _receiver;
-    static int keepReceiving(void (*handler)(int, char *));
-    void uartConfig();
+    static void uartHandler(const unsigned int &);
+    static void (*_handler)(int, char *);
     static GPIO _interrupt;
 };
 
+// Declaring GatewayLoraMesh static members
 GPIO GatewayLoraMesh::_interrupt('C', 3, GPIO::IN);
+void (*GatewayLoraMesh::_handler)(int, char *);
 
 class EndDeviceLoraMesh : public LoraMesh {
 
@@ -234,7 +233,9 @@ void GatewayLoraMesh::sendToAll(char* data) {
 }
 
 void GatewayLoraMesh::uartHandler(const unsigned int &) {
-    cout << "[UART Handler] ";
+// Gets data from UART and passes it for _handler to deal with
+
+    db<Lora>(INF) << "[UART Handler] ";
 
     _interrupt.int_disable();
 
@@ -244,130 +245,56 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
     int len = 0;
     char buf = '0';
     int id[] = {10, 10};
+    int i = 0;
 
     while (!_transparent.ready_to_get());
     id[1] = _transparent.get();
     id[0] = _transparent.get();
-    // Alarm::delay((int)(3500));
-    int i = 0;
+
     while (!_transparent.ready_to_get());
-    // cout << '1';
     while(_transparent.ready_to_get() && len <= 30) {
-        // cout << '2';
         buf = _transparent.get();
         str[len++] = buf;
-        // cout << buf;
-        // Alarm::delay((int)(3500)); // 500 for 115200
         i = 0;
-        while (!_transparent.ready_to_get() && i++ < 80000);
+        while (!_transparent.ready_to_get() && i++ < 3000); // 3000: minimum delay tested for sf = 12, bw = 500, cr = 4/8
     }
 
     str[len] = '\0';
 
-    cout << "Received from " << ((id[0] << 8) + id[1]) << ": " << str << '\n';
-    // cout << "Received from " << (char)(id[0]/10 + '0') << (char)(id[0]%10 + '0')
-    //     << (char)(id[1]/10 + '0') << (char)(id[1]%10 + '0') << ": " << str << '\n';
+    _handler(((id[0] << 8) + id[1]), str);
 
-    str[0] = '\0';
-    len = 0;
-    id[0] = id[1] = 10;
     _transparent.clear_int();
     _interrupt.int_enable();
 }
 
-void GatewayLoraMesh::uartConfig() {
-    // IRQ_UART1
-	// IC ic = IC();
-	// ic.int_vector(NVIC::IRQ_UART0, &uartHandler);
-	// ic.enable(NVIC::IRQ_UART0);
-    // IC::disable();
-    // IC::disable(NVIC::IRQ_UART1);
-	// _transparent.int_disable();
-
-	// IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
-    // NVIC::enable(NVIC::IRQ_UART1);
-    // IC::enable(NVIC::IRQ_UART1);
-
-
-    // _interrupt = GPIO('C', 3, GPIO::IN);
-    // _interrupt.handler(uartHandler, GPIO::FALLING);
-	_transparent.int_enable();
-    // IC::enable();
-
-    // _transparent.int_enable(&uartHandler, true, false, true, true);
-
-    // NVIC::enable();
-    // if (CPU::int_disabled()) CPU::int_enable();
-
-    cout << "UART CONFIGURED\n";
-}
-
 void GatewayLoraMesh::receiver(void (*handler)(int, char *)) {
-// Creates receiver Thread
+// Enables interrupts for UART
 // handler: handler for messages. Receives ID and the message as parameters
 
     cout << "Gateway started waiting for messages\n";
 
-    _receiver = new Thread(&keepReceiving, handler);
-    // int status_receiver = _receiver->join();
+    if (handler)
+        _handler = handler;
+    else
+        _handler = &printMessage;
 
-    // _transparent.int_disable();
-    // IC::int_vector(NVIC::IRQ_UART1, &uartHandler);
-    // _transparent.int_enable();
-    // IC::enable(NVIC::IRQ_UART1);
-    // CPU::int_enable();
+    _interrupt.int_disable();
+    _transparent.clear_int();
+    _interrupt.int_enable();
 }
 
 void GatewayLoraMesh::stopReceiver() {
-// Kills receiver thread
+// Stops receiving messages: disables UART interrupt
 
     cout << "Gateway stopped waiting for new messages\n";
 
-    if (_receiver)
-        delete _receiver;
+    _interrupt.int_disable();
 }
 
 void GatewayLoraMesh::printMessage(int id, char * msg) {
+// Default handler for messages
 
     cout << "Received from " << id << ": " << msg << '\n';
-}
-
-int GatewayLoraMesh::keepReceiving(void (*handler)(int, char *)) {
-// Creates loop to look for incoming messages
-// Messages received are sent for handler
-
-    db<Lora> (WRN) << "GatewayLoraMesh::keepReceiving() called\n";
-
-    // char str[18];
-    char str[30];
-    str[0] = '\0';
-
-    int len = 0;
-    char buf = '0';
-    int id[] = {10, 10};
-
-    while (1) {
-        while (!_transparent.ready_to_get());
-        id[1] = _transparent.get();
-        id[0] = _transparent.get();
-        Alarm::delay((int)(6000));
-        // while(len < 15) {
-        while(_transparent.ready_to_get() && len < 30) {
-            buf = _transparent.get();
-            str[len++] = buf;
-            Alarm::delay((int)(3500)); // 1500 almost fine for SF 12, BW 500, Pot 20
-        }
-
-        str[len] = '\0';
-
-        handler(((id[0] << 8) + id[1]), str);
-
-        str[0] = '\0';
-        len = 0;
-        id[0] = id[1] = 10;
-    }
-
-    return 0;
 }
 
 // IMPLEMENTATIONS FOR CLASS EndDeviceLoraMesh

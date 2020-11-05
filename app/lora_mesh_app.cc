@@ -32,16 +32,27 @@ int main()
     cout << "------------ LoRa Mesh Program: Gateway ------------\n";
 
 	GatewayLoraMesh gateway = GatewayLoraMesh(&justAnotherPrint);
-    // GPIO _interrupt('C', 3, GPIO::IN);
-    // _interrupt.handler(GatewayLoraMesh::uartHandler, GPIO::FALLING);
 	// GatewayLoraMesh gateway = GatewayLoraMesh();
+
+    for (size_t i = 0; i < 5; i++) {
+        cout << i << '\n';
+        Alarm::delay(1000000);
+    }
+    
+    gateway.stopReceiver();
+
+    for (size_t i = 0; i < 5; i++) {
+        cout << i << '\n';
+        Alarm::delay(1000000);
+    }
+
+    gateway.receiver(0);
 
     // char str[] = "GW ON";
     // gateway.sendToAll(str);
 
     while (1) {
         // gateway.sendToAll(str);
-        // // gateway.send(1, str);
         // Alarm::delay(6000000);
 
         // gateway.send(1, "hi");

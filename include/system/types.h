@@ -98,6 +98,7 @@ class RS485;
 class USB;
 class Smart_Plug;
 class Hydro_Board;
+class Lora_Mesh;
 class EEPROM;
 class Display;
 class Serial_Display;

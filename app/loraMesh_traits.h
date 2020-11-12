@@ -249,6 +249,12 @@ template<> struct Traits<DHCP>: public Traits<Network>
 {
 };
 
+template<> struct Traits<Lora_Mesh>: public Traits<void>
+{
+    static const bool enabled = true;
+    static const bool debugged = true;
+};
+
 __END_SYS
 
 #endif

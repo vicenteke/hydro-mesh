@@ -4,18 +4,20 @@
 #include <utility/ostream.h>
 #include <uart.h>
 #include <gpio.h>
-// #include <machine/cortex/emote3_gptm.h>
-#include <machine/cortex/ic.h>
-#include <utility/vector.h>
-// #include <periodic_thread.h>
-#include <thread.h>
-#include <cstdint>
 #include <utility/string.h>
-
 #include <utility/handler.h>
 
-#include "LoraMesh/include/loraMesh.hpp"
-// #include "LoraMesh/include/loraMesh.h"
+// #include "LoraMesh/include/loraMesh.hpp"
+#include <lora_mesh.h>
+
+// Other includes that are used in hydro_thread_app
+// #include <semaphore.h>
+// #include <system/meta.h>
+// #include <adc.h>
+// #include <machine/cortex/emote3_gptm.h>: eMote3_GPTM::delay = Alarm::delay ??
+// #include <periodic_thread.h>: not working, problem with Scheduler
+// #include <flash.h>: no existence
+// #include <machine/cortex_m/emote3_flash.h>: no existence
 
 using namespace EPOS;
 
@@ -27,50 +29,49 @@ void justAnotherPrint(int id, char * msg) {
 
 int main()
 {
-	Alarm::delay(2000000); //Necessary to use minicom
-
-    cout << "------------ LoRa Mesh Program: Gateway ------------\n";
-
-	GatewayLoraMesh gateway = GatewayLoraMesh(&justAnotherPrint);
-	// GatewayLoraMesh gateway = GatewayLoraMesh();
-
-    for (size_t i = 0; i < 5; i++) {
-        cout << i << '\n';
-        Alarm::delay(1000000);
-    }
-    
-    gateway.stopReceiver();
-
-    for (size_t i = 0; i < 5; i++) {
-        cout << i << '\n';
-        Alarm::delay(1000000);
-    }
-
-    gateway.receiver(0);
-
+	// Alarm::delay(2000000); //Necessary to use minicom
+    //
+    // cout << "------------ LoRa Mesh Program: Gateway ------------\n";
+    //
+	// Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&justAnotherPrint);
+	// // GatewayLoraMesh gateway = GatewayLoraMesh();
+    //
     // char str[] = "GW ON";
-    // gateway.sendToAll(str);
-
-    while (1) {
-        // gateway.sendToAll(str);
-        // Alarm::delay(6000000);
-
-        // gateway.send(1, "hi");
-        // Alarm::delay(60000000);
-    }
+    // // gateway.sendToAll(str);
+    //
+    // while (1) {
+    //     gateway.sendToAll(str);
+    //     Alarm::delay(4000000);
+    //
+    //     gateway.send(1, "hi");
+    //     Alarm::delay(4000000);
+    // }
 
     // cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
     //
-	// EndDeviceLoraMesh endDevice = EndDeviceLoraMesh(2);
-	// // EndDeviceLoraMesh endDevice = EndDeviceLoraMesh(2, &justAnotherPrint);
+	// EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(1);
+	// // EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(1, &anotherPrint);
     // // endDevice.stopReceiver();
     //
-    // char str[] = "123456789012345";
+    // char str[] = "ping";
     //
 	// while (1) {
     //     endDevice.send(str);
-    //     Alarm::delay(8000000);
+    //     Alarm::delay(3000000);
 	// }
+
+    cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
+
+	EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2);
+	// EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2, &justAnotherPrint);
+    // endDevice.stopReceiver();
+
+    char str[] = "123456789012345";
+    
+	while (1) {
+        endDevice.send(str);
+        Alarm::delay(8000000);
+	}
 
     return 0;
 }

@@ -1,6 +1,13 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
+// IMPORTANT: this program does not use default UART pins
+// PC5 = RX & PC6 = TX
+// Make sure that is properly configured in <include/machine/cortex/emote3.h>
+
+#define LORA_RX_PIN 5
+#define LORA_TX_PIN 6
+
 //Commands list
 #define MOD_PARAM	     0xD6
 #define LOCAL_READ	     0xE2

@@ -129,6 +129,12 @@ template<> struct Traits<Hydro_Board>: public Traits<Machine_Common>
     static const bool P7_enabled = true;
 };
 
+template<> struct Traits<Lora_Mesh>: public Traits<Machine_Common>
+{
+    static const bool enabled = false;
+    static const bool debugged = false;
+};
+
 template<> struct Traits<Scratchpad>: public Traits<Machine_Common>
 {
     static const bool enabled = false;

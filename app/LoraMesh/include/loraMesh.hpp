@@ -115,8 +115,8 @@ protected:
 	bool	 _checkBit;		// true if the last operation went successful.
 							// Not appliable to: localRead, getParameters.
 
-	static UART _transparent;		// transparent UART (A0/A1): send/receive data
-	UART _command;			// command UART (C3/C4): send/receive configuration data and commands
+	static UART _transparent;		// transparent UART (C5/C6): send/receive data
+	UART _command;			// command UART (A0/A1): send/receive configuration data and commands
 
     static OStream cout;
 
@@ -170,14 +170,14 @@ private:
 };
 
 // Declaring GatewayLoraMesh static members
-GPIO GatewayLoraMesh::_interrupt('C', 3, GPIO::IN);
+GPIO GatewayLoraMesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
 void (*GatewayLoraMesh::_handler)(int, char *);
 
 class EndDeviceLoraMesh : public LoraMesh {
 
 public:
     EndDeviceLoraMesh(uint16_t id,
-                    void (*handler)(char *) = &printMessage,
+                    void (*hand)(char *) = &printMessage,
                     uint16_t net = HYDRO_NET,
                     uint8_t sf = HYDRO_SF,
                     uint8_t bw = HYDRO_BW,
@@ -193,7 +193,10 @@ public:
         _cr     = cr;
         _power  = power;
 
-        receiver(handler);
+        // Initializing interrupts
+        _handler = hand;
+        _interrupt.handler(uartHandler, GPIO::FALLING);
+        receiver();
     }
 
     ~EndDeviceLoraMesh() {
@@ -201,15 +204,20 @@ public:
     }
 
     void send(char* data);
+    void send(char* data, int len);
     void receiver(void (*handler)(char *) = &printMessage);
     void stopReceiver();
     static void printMessage(char *);
 
 private:
-
-    Thread * _receiver;
-    static int keepReceiving(void (*handler)(char *));
+    static void uartHandler(const unsigned int &);
+    static void (*_handler)(char *);
+    static GPIO _interrupt;
 };
+
+// Declaring EndDeviceLoraMesh static members
+GPIO EndDeviceLoraMesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
+void (*EndDeviceLoraMesh::_handler)(char *);
 
 // IMPLEMENTATIONS FOR CLASS GatewayLoraMesh
 
@@ -218,12 +226,14 @@ void GatewayLoraMesh::send(uint16_t id, char* data) {
 
 	db<Lora> (WRN) << "GatewayLoraMesh::sendData() called\n";
 
+// _interrupt.int_disable();
 	_transparent.put(id & 0xFF);
 	_transparent.put((id >> 8) & 0xFF);
 
 	for (int i = 0 ; i < strlen(data) ; i++) {
 		_transparent.put(data[i]);
 	}
+// _interrupt.int_enable();
 }
 
 void GatewayLoraMesh::sendToAll(char* data) {
@@ -268,7 +278,7 @@ void GatewayLoraMesh::uartHandler(const unsigned int &) {
 }
 
 void GatewayLoraMesh::receiver(void (*handler)(int, char *)) {
-// Enables interrupts for UART
+// Starts receiving messages: enables interrupts for UART
 // handler: handler for messages. Receives ID and the message as parameters
 
     cout << "Gateway started waiting for messages\n";
@@ -309,52 +319,69 @@ void EndDeviceLoraMesh::send(char* data) {
 	}
 }
 
+void EndDeviceLoraMesh::send(char* data, int len) {
+// Sends data to gateway
+
+	db<Lora> (WRN) << "EndDeviceLoraMesh::sendData() called\n";
+
+	for (int i = 0 ; i < len ; i++) {
+		_transparent.put(data[i]);
+	}
+}
+
 void EndDeviceLoraMesh::receiver(void (*handler)(char *)) {
-// Creates receiver thread
+// Starts receiving messages: enables interrupts for UART
 
     cout << "End Device " << id() << " started waiting for messages\n";
 
-    _receiver = new Thread(&keepReceiving, handler);
-    // int status_receiver = _receiver->join();
+    if (handler)
+        _handler = handler;
+    else
+        _handler = &printMessage;
+
+    _interrupt.int_disable();
+    _transparent.clear_int();
+    _interrupt.int_enable();
 
 }
+
 void EndDeviceLoraMesh::stopReceiver() {
-// Kills receiver thread
+// Stops receiving messages: disables UART interrupt
 
     cout << "End Device " << id() << " stopped waiting for new messages\n";
 
-    if (_receiver)
-        delete _receiver;
+    _interrupt.int_disable();
 }
 
-int EndDeviceLoraMesh::keepReceiving(void (*handler)(char *)) {
-// Creates a loop to check UART
 
-    db<Lora> (WRN) << "EndDeviceLoraMesh::keepReceiving() called\n";
+void EndDeviceLoraMesh::uartHandler(const unsigned int &) {
+// Gets data from UART and passes it for _handler to deal with
+
+    db<Lora>(INF) << "[UART Handler] ";
+
+    _interrupt.int_disable();
 
     char str[30];
     str[0] = '\0';
 
     int len = 0;
     char buf = '0';
+    int i = 0;
 
-    while (1) {
-        while (!_transparent.ready_to_get());
-        while(_transparent.ready_to_get() && len <= 30) {
-            buf = _transparent.get();
-            str[len++] = buf;
-            Alarm::delay((int)(3000));
-        }
-
-        str[len] = '\0';
-
-        handler(str);
-
-        str[0] = '\0';
-        len = 0;
+    while (!_transparent.ready_to_get());
+    while(_transparent.ready_to_get() && len <= 30) {
+        buf = _transparent.get();
+        str[len++] = buf;
+        i = 0;
+        while (!_transparent.ready_to_get() && i++ < 4000); // 4000: minimum delay tested for sf = 12, bw = 500, cr = 4/8
     }
 
-    return 0;
+    str[len] = '\0';
+
+    _handler(str);
+
+    _transparent.clear_int();
+    _interrupt.int_enable();
 }
 
 void EndDeviceLoraMesh::printMessage(char * msg) {

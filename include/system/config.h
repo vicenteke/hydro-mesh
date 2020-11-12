@@ -132,6 +132,7 @@ namespace EPOS {
 #define __ADC_H                 __HEADER_MACH(adc)
 #define __SMART_PLUG_H          __HEADER_MACH(smart_plug)
 #define __HYDRO_BOARD_H         __HEADER_MACH(hydro_board)
+#define __LORA_MESH_H           __HEADER_MACH(lora_mesh)
 #define __PWM_H                 __HEADER_MACH(pwm)
 #define __PERSISTENT_STORAGE_H  __HEADER_MACH(persistent_storage)
 #define __RFID_READER_H         __HEADER_MACH(rfid_reader)

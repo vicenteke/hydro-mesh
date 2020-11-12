@@ -923,7 +923,7 @@ public:
                                 // conversion is completed before the previous data has been read,
                                 // the EOC bit remains high.
                                 // 0: Conversion not complete
-                                // 1: Conversion completed 
+                                // 1: Conversion completed
         ADCCON1_ST    = 1 << 6, // Start conversion
                                 // Read as 1 until conversion completes
                                 // 0: No conversion in progress.
@@ -1089,11 +1089,11 @@ protected:
         } else {
             bool m95_enabled = Traits<M95>::enabled && (Traits<NIC>::NICS::Find<M95>::Result <= Traits<Network>::NETWORKS::Length - 1);
             if((!m95_enabled) || (Traits<M95>::UART_UNIT != 1)) {
-                ioc(PC4_SEL) = UART1_TXD;
-                ioc(PC4_OVER) = OE;
-                ioc(PC3_OVER) = 0;
-                ioc(UARTRXD_UART1) = (2 << 3) + 3;
-                gpioc(AFSEL) |= (PIN3) + (PIN4);
+                ioc(PC6_SEL) = UART1_TXD;
+                ioc(PC6_OVER) = OE;
+                ioc(PC5_OVER) = 0;
+                ioc(UARTRXD_UART1) = (2 << 3) + 5;
+                gpioc(AFSEL) |= (PIN5) + (PIN6);
             } else {
                 // The M95 GPRS board uses UART1 in non-standard pins
                 ioc(PD1_SEL) = UART1_TXD;

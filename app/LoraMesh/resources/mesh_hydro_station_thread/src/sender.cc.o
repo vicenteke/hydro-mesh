@@ -1,0 +1,335 @@
+#include "../include/sender.h"
+#include "../include/defines.h"
+
+bool Sender::_initialized = false;
+EPOS::eMote3_GPRS * Sender::_gprs = 0;
+int Sender::_signal_str = 0;
+
+Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m) 
+{
+
+    _pwrkey = new EPOS::GPIO{'C', 4, EPOS::GPIO::OUTPUT};
+    _status = new EPOS::GPIO{'C', 1, EPOS::GPIO::INPUT};
+    _uart = new EPOS::UART{9600, 8, 0, 1, 1};
+
+    _gprs = new EPOS::eMote3_GPRS{*_pwrkey, *_status, *_uart};
+    _interface->print_message(Interface::MESSAGE::GPRSCREATED, _status->get());
+
+    kout << "Unsent msgs: " << unsent_messages() << "\n";
+} 
+ 
+     
+int Sender::send_data(void * msg, int size)
+{
+    
+    
+    auto sent = _gprs->send_http_post(DATA_SERVER, (const char*) msg, (unsigned int) size);
+    
+    if(!sent) {
+        
+        for(unsigned int i = 0; i < 2; i++) {
+            _interface->blink_error(Interface::ERROR::TRYINGSENDAGAIN);
+
+            _gprs->off();
+            eMote3_GPTM::delay(200000);
+            _gprs->on(); 
+            _gprs->use_dns(); // This parameter is (or should be) reset when the module resets.
+                        
+            eMote3_GPTM::delay(EMOTEGPTMLONGDELAY); // Hope for god network is up.            
+            
+            sent = _gprs->send_http_post(DATA_SERVER, (const char *) msg, (unsigned int) size);
+            if(sent){
+                _interface->blink_success(Interface::SUCCESS::MESSAGESENT);
+                break;
+            } 
+        }
+        
+    } 
+    
+    return sent;  
+}
+ 
+void Sender::send_or_store()
+{
+    EPOS::OStream x;
+    x << "Sending data....\n";
+    
+    bool tryToSend = true;
+    
+    long unsigned int timestamp = 0;
+    timestamp = getCurrentTime();
+    
+    /*
+    // block until time is valid (2016 onwards)
+    while( (timestamp < 1451606400) )
+    {
+        if(timestamp != 0 ) // we got a wrong value
+            eMote3_GPTM::delay(5000000ul);
+            
+        timestamp = getCurrentTime();
+    }  
+    */
+    
+    _msg->setTime(timestamp); 
+    
+    int idOffset = strlen(HYDRO_STATION_ID) + 1;
+    char buf[sizeof(DBEntry) + idOffset ];
+    strcpy(buf, HYDRO_STATION_ID);
+    
+    _msg->build(buf + idOffset);
+
+    _msg->dump();
+        
+    auto sent = tryToSend && send_data(buf, sizeof(DBEntry) + idOffset);
+    x << (sent? "SENT" : "SEND FAILED") << "\n";
+
+    if(!sent) {
+        x << "Storing on flash\n";
+        
+        if(!_fifo.push(buf + idOffset)) 
+        {
+            x << "STORAGE FULL! Message discarded.\n";
+        }
+        
+        x << "Unsent msgs: " << unsent_messages() << "\n";
+        
+        tryToSend = false;
+    }
+   
+    
+}
+
+void Sender::try_sending_queue() 
+{
+    
+    EPOS::OStream cout;
+    int idOffset = strlen(HYDRO_STATION_ID) + 1;
+    int bufSize = SENDING_BATCH_SIZE*sizeof(DBEntry) + idOffset;
+    char buf[bufSize];
+    
+    while( unsent_messages() )
+    {
+        int toSend = (unsent_messages() > SENDING_BATCH_SIZE)? SENDING_BATCH_SIZE : unsent_messages();
+        strcpy(buf, HYDRO_STATION_ID);
+    
+        for(int i = 0; i < toSend; i++)
+            _fifo.peek(buf + idOffset + i*sizeof(DBEntry), i);
+        
+        bool sent = send_data(buf, bufSize);
+        
+        if(sent)
+        {
+            cout << "SENT from fifo\n";
+            for(int i = 0; i < toSend; i++)
+                _fifo.pop(); 
+        }
+        else
+        {
+            cout << "SEND FAILED from fifo\n";
+            return;
+        } 
+    }
+}
+
+bool Sender::init()
+{
+    
+    _gprs->power_on();
+    _gprs->set_baudrate();
+    
+    eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY / 2);
+    if(init_network()){
+        if(init_config()){
+            
+            _gprs->use_dns();
+            enableTimeSincronization();
+            
+            _initialized = true;            
+            
+        }else{          
+            return false;
+        }
+    }else{
+        return false;
+    }
+    return false;
+}
+
+void Sender::query_signal_strength()
+{
+    if(_initialized)
+        _signal_str = _gprs->get_signal_quality();
+}
+
+bool Sender::init_config()
+{
+    
+    kout << "[Sender::init_config]\n";
+    
+    bool res;
+    res = false;
+    _interface->print_message(Interface::MESSAGE::GPRSSETUP,0);
+
+    eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+    
+#if GPRS_USE_AUTH
+    
+    while(!res) 
+    {
+        _gprs->send_command("AT+QIACT");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT);
+        
+        if(_status->get()==0)
+            _gprs->on();
+        
+        eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);        
+    }
+    
+#else
+ 
+    while(!res) 
+    {
+        _gprs->send_command("AT+CGATT=1");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT);
+        
+        _interface->print_message(Interface::MESSAGE::GPRSSTATUS, res);
+                
+        if(_status->get()==0)
+            _gprs->on();
+        
+        eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);        
+    }
+    
+    
+    _gprs->send_command("AT+CGACT?");
+    res = _gprs->await_response("OK", RESPONSETIMEOUT*10);
+    
+    
+    res = false;
+    while(!res) {
+        _gprs->send_command("AT+CGACT=1,1");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT*10);
+        //_interface->print_message(Interface::MESSAGE::GPRSSTATUS, res);
+        if(_status->get()==0)
+        {   
+            kout << "[Sender::init_config] module is off\n";
+            _gprs->on();
+        }
+    }
+    
+#endif
+
+    if(res)
+        kout << "success\n";
+    else
+        kout << "failure\n";
+    
+    return res;
+}
+
+bool Sender::init_network(){
+    
+    kout << "[Sender::init_network]\n";
+    
+    bool res = false;//_gprs->sim_card_ready();
+    unsigned int tmp = 1;
+    
+    eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+
+    while(!res) {
+#if GPRS_USE_AUTH
+        _gprs->send_command("AT+QIREGAPP=\""GPRS_OPERATOR_APN"\",\""GPRS_AUTH_USER"\",\""GPRS_AUTH_PASSWD"\"");
+        res = _gprs->await_response("OK", EMOTEGPTMSHORTDELAY);
+        
+        _gprs->send_command("AT+QIREGAPP?");
+        res = res && _gprs->await_response("OK", RESPONSETIMEOUT);
+#else
+        _gprs->send_command("AT+CGDCONT=1,\"IP\",\""GPRS_OPERATOR_APN"\",,0,0");
+        res = _gprs->await_response("OK", EMOTEGPTMSHORTDELAY);
+        
+        _gprs->send_command("AT+CGDCONT?");
+        res = res && _gprs->await_response("OK", RESPONSETIMEOUT);
+#endif
+        if(!_status->get())
+            _gprs->on();
+        eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+        
+        tmp++;
+    }    
+
+    if(res)
+        kout << "success\n";
+    else
+        kout << "failure\n"; 
+    
+    return res;
+}
+
+void Sender::enableTimeSincronization()
+{
+    bool res = false;
+    while(!res) {
+        _gprs->send_command("AT+CTZR=0");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT);
+    }
+    
+    res = false;
+    while(!res) {
+        _gprs->send_command("AT+QNITZ=1");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT);
+    }
+    
+    res = false;
+    while(!res) {
+        _gprs->send_command("AT+CTZU=1");
+        res = _gprs->await_response("OK", RESPONSETIMEOUT);
+    }
+    
+    // get current time now
+    /*
+    char buf[128];
+    memset(buf, 0, 128);
+    
+    res = _gprs->await_response("+QNITZ:", 10000000, buf);
+    
+    kout << "TIME IS " << buf;
+    kout << "\nEND\n";
+    */
+    
+}
+
+#include "../include/unixtime.h"
+  
+#define DECIMAL_AT(X) ( (buf[(X)] - '0')*10 + (buf[(X)+1] - '0') )
+
+long unsigned int Sender::getCurrentTime()
+{
+    // Example str, includes quotes
+    // "16/11/18,19:45:35-08"
+    
+    DateTime dt;
+    char buf[64];
+    memset(buf, 0, 64);
+        
+    if(_gprs->queryTime( buf ))
+    {
+        dt.year = 2000 + DECIMAL_AT(2);
+        dt.month = DECIMAL_AT(5);
+        dt.date = DECIMAL_AT(8);
+        
+        dt.hr = DECIMAL_AT(11);
+        dt.min = DECIMAL_AT(14);
+        dt.sec = DECIMAL_AT(17);
+        
+        kout << "Decoded time is: " << dt.year << "-" << dt.month << "-" << dt.date << " " << dt.hr << ":" << dt.min << ":" << dt.sec << "\n";
+        
+        return unixtime(dt, 0, 0);
+    }
+    else
+    {
+        kout << "TIME QUERY FAILED\n";
+    }
+    
+    return 0; // we suck
+        
+}

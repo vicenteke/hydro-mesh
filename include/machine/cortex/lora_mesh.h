@@ -7,6 +7,7 @@
 #include <utility/ostream.h>
 #include <uart.h>
 #include <gpio.h>
+#include <mutex.h>
 // #include <stdint.h>
 #include <lora_mesh.h>
 
@@ -18,16 +19,14 @@ class Lora_Mesh : public Lora_Mesh_Common {
 public:
     // CONSTANTS DECLARATION
 
-    static const int LORA_RX_PIN = 5;
     // IMPORTANT: this program does not use default UART pins
-    static const int LORA_TX_PIN = 6;
-    // PC5 = RX & PC6 = TX
     // Make sure that is properly configured in <include/machine/cortex/emote3.h>
+    // PC5 = RX & PC6 = TX
+    static const int LORA_RX_PIN = 5;
+    static const int LORA_TX_PIN = 6;
 
-    static const char LORA_MESSAGE_FINAL = '~'; // Marks end of the message
-    // You can change it if you need to send this char
-
-    static const int LORA_TIMEOUT        = 1000000;
+    static const int LORA_SUPPLY_PIN_1 = 5; // Provides power to the LoRa MESH module
+    static const int LORA_SUPPLY_PIN_2 = 1; // Provides power to the LoRa MESH module
 
 
     //Commands list
@@ -41,6 +40,15 @@ public:
     static const int RSSI		   = 0xD5;
     static const int TRACE_ROUTE   = 0xD2;
     static const int SEND_PACK	   =  0x28;
+
+    // Commands for Application
+    // You can change those values if you need to send those chars
+    static const char LORA_MESSAGE_FINAL = '~'; // Marks end of the message
+    static const char LORA_GET_NODES = '#'; // Used by getNodesInNet()
+
+    // Values
+    static const int LORA_TIMEOUT        = 1000000;
+    static const int LORA_MAX_NODES      = 15; // Used by GW to create _nodes
 
     // ID's
     static const int MASTER_ID     = 0;
@@ -77,6 +85,9 @@ public:
         // _command.loopback(false);
 
         _checkBit = true;
+
+        // turnOn();
+
 	}
 
 	~Lora_Mesh() {}
@@ -147,10 +158,28 @@ public:
         _checkBit = b;
     }
 
+    static void turnOn() {
+        _supply.set();
+        _supply2.set();
+        Alarm::delay(2000000);
+        _isOn = true;
+        _mutex.unlock();
+        cout << "Module is on\n";
+    }
+
+    static void turnOff() {
+        _mutex.lock();
+        _isOn = false;
+        _supply.clear();
+        _supply2.clear();
+        Alarm::delay(20000);
+        cout << "Module is off\n";
+    }
+
 protected:
 
 	// int _uid;			// unique ID
-	int _id;			// device's ID
+	static int _id;			// device's ID
 	int _net;			// network
 	int  _sf;			// spreading factor
 	int  _bw;			// bandwidth
@@ -161,9 +190,13 @@ protected:
 							// Not appliable to: localRead, getParameters.
 
 	static UART _transparent;		// transparent UART (C5/C6): send/receive data
-	UART _command;			// command UART (A0/A1): send/receive configuration data and commands
+	// UART _command;			// command UART (A0/A1): send/receive configuration data and commands
 
     static OStream cout;
+    static GPIO _supply; // GPIO that supplies the LoRa module
+    static GPIO _supply2; // GPIO that supplies the LoRa module
+    static bool _isOn;
+    static Mutex _mutex; // Guarantees that the LoRa module is on
 
 };
 
@@ -187,6 +220,8 @@ public:
         _bw     = bw;
         _cr     = cr;
         _power  = power;
+        _nodes.size = 0;
+        _nodes.id[0] = -1;
 
         // Initializing interrupts
         _handler = hand;
@@ -196,18 +231,21 @@ public:
 
     ~Gateway_Lora_Mesh() {
         stopReceiver();
+        cout << "~Gateway() destructor called\n";
     }
 
 
     void send(int id, char* data, int len = 0) {
     // Sends data to node defined by "id"
 
-    	db<Lora_Mesh> (WRN) << "Gateway_Lora_Mesh::sendData() called\n";
+    	db<Lora_Mesh> (WRN) << "Gateway_Lora_Mesh::send() called\n";
 
         if (len <= 0)
             len = strlen(data);
 
     // _interrupt.int_disable();
+        // if(!_isOn) turnOn();
+        _mutex.lock();
     	_transparent.put(id & 0xFF);
     	_transparent.put((id >> 8) & 0xFF);
 
@@ -215,13 +253,43 @@ public:
     		_transparent.put(data[i]);
     	}
         _transparent.put(LORA_MESSAGE_FINAL);
+        _mutex.unlock();
     // _interrupt.int_enable();
+    }
+
+    void send(int id, char c) {
+    // Sends char to node defined by "id"
+
+        db<Lora_Mesh> (WRN) << "Gateway_Lora_Mesh::send(char) called\n";
+
+        // if(!_isOn) turnOn();
+        _mutex.lock();
+
+    	_transparent.put(id & 0xFF);
+    	_transparent.put((id >> 8) & 0xFF);
+        _transparent.put(c);
+        _transparent.put(LORA_MESSAGE_FINAL);
+
+        _mutex.unlock();
     }
 
     void sendToAll(char* data, int len = 0) {
     // Sends data to all nodes
 
         send(BROADCAST_ID, data, len);
+    }
+
+    void getNodesInNet() {
+    // Gets the ID's of the nodes in the network
+
+        db<Lora_Mesh> (WRN) << "Gateway_Lora_Mesh::getNodesInNet() called\n";
+
+        for (int i = 0; i < _nodes.size; i++) {
+            _nodes.id[i] = -1;
+        }
+        _nodes.size = 0;
+
+        send(BROADCAST_ID, LORA_GET_NODES);
     }
 
     void receiver(void (*handler)(int, char *) = 0) {
@@ -262,8 +330,9 @@ private:
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
 
-        db<Lora_Mesh>(INF) << "[UART Handler] ";
+        // db<Lora_Mesh>(WRN) << "[UART Handler] ";
 
+        _mutex.lock();
         _interrupt.int_disable();
 
         char str[30];
@@ -274,6 +343,7 @@ private:
         int id[] = {10, 10};
         int i = 0;
 
+        // Getting data
         while (!_transparent.ready_to_get());
         id[1] = _transparent.get();
         id[0] = _transparent.get();
@@ -283,22 +353,54 @@ private:
             buf = _transparent.get();
             if(buf != '\0' && buf != LORA_MESSAGE_FINAL)
                 str[len++] = buf;
+
             i = 0;
-            while (buf != LORA_MESSAGE_FINAL && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT); // 3000: minimum delay tested for sf = 12, bw = 500, cr = 4/8
+            while (buf != LORA_MESSAGE_FINAL && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
             if (i >= LORA_TIMEOUT)
                 db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
         }
 
         str[len] = '\0';
 
-        _handler(((id[0] << 8) + id[1]), str);
+        // Looking for commands
+        if (str[1] == '\0') {
+            switch(str[0]) {
+                case LORA_GET_NODES:
+                    addNode((id[0] << 8) + id[1]);
+                    break;
+                default:
+                    _handler(((id[0] << 8) + id[1]), str);
+                    break;
+            }
+        } else
+            _handler(((id[0] << 8) + id[1]), str);
 
         _transparent.clear_int();
         _interrupt.int_enable();
+        _mutex.unlock();
     }
+
+    static void addNode(int id) {
+
+        _nodes.id[_nodes.size++] = id;
+
+        db<Lora_Mesh> (WRN) << _nodes.size << " nodes in net:";
+
+        for (int i = 0; i < _nodes.size; i++)
+            db<Lora_Mesh> (WRN) << " ["<< _nodes.id[i] << ']';
+
+        db<Lora_Mesh> (WRN) << '\n';
+    }
+
+public:
+    typedef struct nodes { // Stores the ID's of nodes in the net
+        int size;
+        int id[LORA_MAX_NODES];
+    } nodes_t;
 
 private:
 
+    static nodes_t _nodes;
     static void (*_handler)(int, char *);
     static GPIO _interrupt;
 };
@@ -337,16 +439,34 @@ public:
     void send(char* data, int len = 0) {
     // Sends data to gateway
 
-    	db<Lora_Mesh> (WRN) << "EndDevice_Lora_Mesh::sendData() called\n";
+    	db<Lora_Mesh> (WRN) << "EndDevice_Lora_Mesh::send() called\n";
 
         if (len <= 0)
             len = strlen(data);
+
+        // if(!_isOn) turnOn();
+        _mutex.lock();
 
     	for (int i = 0 ; i < len ; i++) {
     		_transparent.put(data[i]);
     	}
 
         _transparent.put(LORA_MESSAGE_FINAL);
+        _mutex.unlock();
+    }
+
+    static void send(char c) {
+    // Sends data to gateway
+
+    	db<Lora_Mesh> (WRN) << "EndDevice_Lora_Mesh::send(char) called\n";
+
+        // if(!_isOn) turnOn();
+        _mutex.lock();
+
+		_transparent.put(c);
+        _transparent.put(LORA_MESSAGE_FINAL);
+
+        _mutex.unlock();
     }
 
     void receiver(void (*handler)(char *) = 0) {
@@ -382,8 +502,9 @@ private:
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
 
-        db<Lora_Mesh>(INF) << "[UART Handler] ";
+        // db<Lora_Mesh>(INF) << "[UART Handler] ";
 
+        _mutex.lock();
         _interrupt.int_disable();
 
         char str[30];
@@ -410,10 +531,26 @@ private:
             db<Lora_Mesh> (WRN) << "Received message intended to node " << (int)((str[0] << 8) + str[1]) << ":\n";
             strncpy(str, str + 2, strlen(str) - 2);
         }
-        _handler(str);
+
+        if (str[1] == '\0') {
+            switch(str[0]) {
+                case LORA_GET_NODES:
+                    // Alarm::delay(_id * 1000);
+                    for (int k = 0; k < _id * 1000; k++);
+                    _mutex.unlock();
+                    send(LORA_GET_NODES);
+                    _mutex.lock();
+                    break;
+                default:
+                    _handler(str);
+                    break;
+            }
+        } else
+            _handler(str);
 
         _transparent.clear_int();
         _interrupt.int_enable();
+        _mutex.unlock();
     }
 
 private:

@@ -29,23 +29,26 @@ void justAnotherPrint(int id, char * msg) {
 
 int main()
 {
-	// Alarm::delay(2000000); //Necessary to use minicom
-    //
-    // cout << "------------ LoRa Mesh Program: Gateway ------------\n";
-    //
+	Alarm::delay(1000000); //Necessary to use minicom
+
+    cout << "------------ LoRa Mesh Program: Gateway ------------\n";
+
 	// Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&justAnotherPrint);
-	// // GatewayLoraMesh gateway = GatewayLoraMesh();
-    //
+	Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh();
+
     // char str[] = "GW ON";
-    // // gateway.sendToAll(str);
-    //
-    // while (1) {
-    //     gateway.sendToAll(str);
-    //     Alarm::delay(4000000);
-    //
-    //     gateway.send(1, "hi");
-    //     Alarm::delay(4000000);
-    // }
+    // gateway.sendToAll(str);
+
+    Alarm::delay(5000000);
+    gateway.getNodesInNet();
+
+    while (1) {
+        // gateway.sendToAll(str);
+        // Alarm::delay(4000000);
+
+        // gateway.send(1, "hi");
+        // Alarm::delay(4000000);
+    }
 
     // cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
     //
@@ -57,21 +60,21 @@ int main()
     //
 	// while (1) {
     //     endDevice.send(str);
-    //     Alarm::delay(3000000);
+    //     Alarm::delay(10000000);
 	// }
 
-    cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
-
-	EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2);
-	// EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2, &justAnotherPrint);
-    // endDevice.stopReceiver();
-
-    char str[] = "123456789012345";
-    
-	while (1) {
-        endDevice.send(str);
-        Alarm::delay(8000000);
-	}
+    // cout << "------------ LoRa Mesh Program: EndDevice ------------\n";
+    //
+	// EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2);
+	// // EndDevice_Lora_Mesh endDevice = EndDevice_Lora_Mesh(2, &justAnotherPrint);
+    // // endDevice.stopReceiver();
+    //
+    // char str[] = "123456789012345";
+    //
+	// while (1) {
+    //     endDevice.send(str);
+    //     Alarm::delay(8000000);
+	// }
 
     return 0;
 }

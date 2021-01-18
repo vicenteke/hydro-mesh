@@ -29,7 +29,6 @@ using namespace EPOS;
 OStream Lora_Mesh::cout;
 UART Lora_Mesh::_transparent;
 GPIO Lora_Mesh::_supply('D', LORA_SUPPLY_PIN_1, GPIO::OUT);
-GPIO Lora_Mesh::_supply2('C', LORA_SUPPLY_PIN_2, GPIO::OUT);
 bool Lora_Mesh::_isOn = false;
 Mutex Lora_Mesh::_mutex = Mutex();
 int Lora_Mesh::_id;

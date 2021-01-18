@@ -41,21 +41,21 @@ void Interface::blink_error(ERROR type){
             print_message(MESSAGE::GPRSSENDERROR,0);
             break;
     }
-    
+
 }
 
 void Interface::blink(unsigned int x, unsigned int period){
     for (auto i = 0u; i < x; ++i) {
         led->set();
-        eMote3_GPTM::delay(period);
+        Alarm::delay(period);
         led->clear();
-        eMote3_GPTM::delay(period);
+        Alarm::delay(period);
     }
 }
 
 void Interface::print_message(MESSAGE m, int data){
     if(!_production){
-        EPOS::OStream a;    
+        EPOS::OStream a;
         switch(m){
             case GPRSCREATED:
                 a << "GPRS created. Actual status: "<<data<<"\n";

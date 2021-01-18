@@ -1086,14 +1086,22 @@ protected:
 
             //5. Set GPIO pins A1 and A0 to peripheral mode
             gpioa(AFSEL) |= (PIN0) + (PIN1);
+
         } else {
             bool m95_enabled = Traits<M95>::enabled && (Traits<NIC>::NICS::Find<M95>::Result <= Traits<Network>::NETWORKS::Length - 1);
             if((!m95_enabled) || (Traits<M95>::UART_UNIT != 1)) {
-                ioc(PC6_SEL) = UART1_TXD;
-                ioc(PC6_OVER) = OE;
-                ioc(PC5_OVER) = 0;
-                ioc(UARTRXD_UART1) = (2 << 3) + 5;
-                gpioc(AFSEL) |= (PIN5) + (PIN6);
+                // ioc(PC4_SEL) = UART1_TXD;
+                // ioc(PC4_OVER) = OE;
+                // ioc(PC3_OVER) = 0;
+                // ioc(UARTRXD_UART1) = (2 << 3) + 3;
+                // gpioc(AFSEL) |= (PIN3) + (PIN4);
+
+                // lora_mesh uses UART0 in non-standard pins
+                ioc(PC7_SEL) = UART1_TXD;
+                ioc(PC7_OVER) = OE;
+                ioc(PC6_OVER) = 0;
+                ioc(UARTRXD_UART1) = (2 << 3) + 6;
+                gpioc(AFSEL) |= (PIN6) + (PIN7);
             } else {
                 // The M95 GPRS board uses UART1 in non-standard pins
                 ioc(PD1_SEL) = UART1_TXD;

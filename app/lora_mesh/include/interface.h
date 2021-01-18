@@ -1,6 +1,6 @@
 /*
 *	THIS CLASS CONTAINS METHODS TO GIVE THE USER A FEEDBACK OF WHAT'S HAPPENING
-*	
+*
 ----------------WHEN THE CODE IS ABOUT TO GO OUT OF THE LAB, SET [isProduction] attribute to true
 *
 * --> it uses the board led on GPIO C3 to gove some feedback
@@ -23,12 +23,13 @@
 
 #include <machine.h>
 #include <gpio.h>
-#include <machine/cortex_m/emote3_gptm.h>
+// #include <machine/cortex_m/emote3_gptm.h>
+#include <alarm.h>
 
 using namespace EPOS;
 
 class Interface{
-	public:		
+	public:
 		enum ERROR{NOGPRSCARD,NONETWORK,TRYINGSENDAGAIN};
 		enum SUCCESS{SIMCARDINITIALIZED,MESSAGESENT};
 		enum MESSAGE{GPRSCREATED,
@@ -50,7 +51,7 @@ class Interface{
 
 		Interface(bool production = false){
 			_production = production;
-			led = new EPOS::GPIO{'C', 3, EPOS::GPIO::OUTPUT};
+			led = new EPOS::GPIO{'C', 3, EPOS::GPIO::OUT};
 		}
 
 		void show_life();
@@ -63,7 +64,7 @@ class Interface{
 
 		static bool _production;
 
-	private:		
+	private:
 		GPIO *led;
 
 		void blink(unsigned int x,unsigned int period = 50000);
@@ -71,4 +72,3 @@ class Interface{
 };
 
 #endif
-

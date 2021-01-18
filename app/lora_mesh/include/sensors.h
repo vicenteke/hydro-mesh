@@ -5,7 +5,8 @@
 #include "defines.h"
 #include <adc.h>
 #include <system/meta.h>
-#include <machine/cortex_m/emote3_gptm.h>
+// #include <machine/cortex_m/emote3_gptm.h>
+#include <alarm.h>
 
 using namespace EPOS;
 
@@ -41,9 +42,9 @@ public:
     Analog_Sensor_Base(ADC & adc, GPIO & relay):
         Sensor_Base(relay),
         adc(adc)
-        
+
     {}
-    
+
     int read(){return adc.read();}
 protected:
     ADC & adc;
@@ -84,27 +85,27 @@ public://adc = tensao | adc2 = corrente
         Analog_Sensor_Base{adc, relay},
         infrared(infrared)
     {}
-    
-    
-    
+
+
+
     void init(){}
-    
-    
+
+
     int sample()
     {
         short turb_data;
         // Filter daylight as directed by sensor manufacturer
-        eMote3_GPTM::delay(250000); // Wait 250 ms before reading
+        Alarm::delay(250000); // Wait 250 ms before reading
         auto daylight = adc.read();
 		//kout << "daylight = " << daylight << "\n";
-        eMote3_GPTM::delay(250000); // Wait more 250 ms because we've been told to
+        Alarm::delay(250000); // Wait more 250 ms because we've been told to
         infrared.set();
-        eMote3_GPTM::delay(450000); // Wait 200+250 ms before reading again
-        
+        Alarm::delay(450000); // Wait 200+250 ms before reading again
+
         auto mixed = adc.read();
-		
+
         //kout << "IR = " << mixed << "\n";
-        eMote3_GPTM::delay(250000); // Wait 200+250 ms before reading again
+        Alarm::delay(250000); // Wait 200+250 ms before reading again
         infrared.clear();
         //kout << "daylight= " << daylight << endl;
         //kout << "IR: = " << mixed << endl;
@@ -114,10 +115,10 @@ public://adc = tensao | adc2 = corrente
         turb_data = (turb_data < 0) ? 0 : turb_data;
         return turb_data;
     }
-    
-    
+
+
     unsigned char signal(){return 2;}
-        
+
 
 private:
     GPIO & infrared;
@@ -135,31 +136,31 @@ public://adc = tensao | adc2 = corrente
         //adc2(adc2),
         _infrared(infrared)
     {}
-    
-    
-    
+
+
+
     void init(){}
-    
+
     void enable(){_analog1.enable();}
-    
+
     void disable(){_analog1.disable();}
-    
+
     int sample()
     {
         // Filter daylight as directed by sensor manufacturer
-        eMote3_GPTM::delay(250000); // Wait 250 ms before reading
+        Alarm::delay(250000); // Wait 250 ms before reading
 
-        eMote3_GPTM::delay(250000); // Wait more 250 ms because we've been told to
+        Alarm::delay(250000); // Wait more 250 ms because we've been told to
         //_infrared.set();
-        eMote3_GPTM::delay(450000); // Wait 200+250 ms before reading again
-        
+        Alarm::delay(450000); // Wait 200+250 ms before reading again
+
         auto current = _analog1.read();
         auto volt = _analog2.read();
         short turb_data;
-        
+
         kout<<"\ncorrente: " << current<<endl;
         kout<<"tensao: " << volt<<endl;
-        
+
         if (volt < 1450){
             turb_data = current;
             _signal = 0;
@@ -168,18 +169,18 @@ public://adc = tensao | adc2 = corrente
             _signal = 1;
         }
 		turb_data = (turb_data < 0) ? 0 : turb_data;
-        
-      
-        eMote3_GPTM::delay(250000); // Wait 200+250 ms before reading again
+
+
+        Alarm::delay(250000); // Wait 200+250 ms before reading again
         //_infrared.clear();
         //eMote3_GPTM::delay(10000000);
 
         return turb_data;
     }
-    
-    
+
+
     unsigned char signal(){return _signal;}
-        
+
 
 private:
     Analog_Sensor_Base _analog1;
@@ -213,13 +214,17 @@ public:
     {
         _instance = this;
 
-        input.input();
-        input.pull_up();
+        //--
+        // input.input();
+        // input.pull_up();
+        input.direction(GPIO::IN);
+        input.pull(GPIO::UP);
+        //--
 
         input.handler(&handler);
         input.int_enable(GPIO::FALLING, false);
     }
-  
+
     static void handler(const unsigned int & i)
     {
         if(_instance && !_debouncing){
@@ -233,29 +238,29 @@ public:
           _instance->_debouncing = false;
         }
     }
-  
+
     int count()
     {
         return _count;
     }
-  
+
     void resetCount()
     {
         _count = 0;
     }
-  
+
     int countAndReset()
     {
         int ret = _count;
         _count -= ret;
         return ret;
     }
-  
+
 private:
-    GPIO &input;
+    GPIO & input;
     int _count;
     static bool _debouncing;
-  
+
     // this is needed because we treat the interrupt in a static function
     static Pluviometric_Sensor * _instance;
 };
@@ -286,8 +291,9 @@ public:
     void clear_state()
     {
         while(_spi.is_busy()) ; // wait for stuff to finish
-        while(_spi.data_available())
-            _spi.get_data_non_blocking(); // clear input buffer
+        //-- while(_spi.data_available())
+        //--     _spi.get_data_non_blocking(); // clear input buffer
+        _spi.get_datamod(); //--
     }
 
     int sample_ch(unsigned char ch)
@@ -297,7 +303,7 @@ public:
         send_byte(0x80 | ch << 4); // start conversion of ch
         send_byte(0); // generate clock for conversion
 
-        eMote3_GPTM::delay(10); // 10us
+        Alarm::delay(10); // 10us
         send_byte(0); // generate clock for input
         send_byte(0); // generate clock
 

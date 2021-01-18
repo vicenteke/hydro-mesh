@@ -7,9 +7,10 @@
 #include <utility/ostream.h>
 #include <uart.h>
 #include <adc.h>
-#include <machine/cortex_m/emote3_gprs.h>
-#include <machine/cortex_m/emote3_gptm.h>
-#include <flash.h>
+// #include <machine/cortex_m/emote3_gprs.h>
+// #include <machine/cortex_m/emote3_gptm.h>
+// #include <flash.h>
+#include <persistent_storage.h>
 
 #include "defines.h"
 #include "interface.h"

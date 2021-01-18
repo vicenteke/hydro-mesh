@@ -19,7 +19,7 @@
 #ifndef SENDER_H_
 #define SENDER_H_
 
-#include "flash.h"
+// #include "flash.h"
 #include "interface.h"
 #include "messages.h"
 #include "defines.h"
@@ -28,11 +28,11 @@
 #include <machine.h>
 #include <gpio.h>
 #include <uart.h>
-#include <machine/cortex_m/emote3_gprs.h>
-#include <machine/cortex_m/emote3_gptm.h>
+// #include <machine/cortex_m/emote3_gprs.h>
+// #include <machine/cortex_m/emote3_gptm.h>
 
 #include "flashfifo.h"
-#include "loraMesh.hpp"
+// #include "loraMesh.hpp"
 
 using namespace EPOS;
 
@@ -81,8 +81,8 @@ private:
     // EPOS::UART *_uart;
     Interface *_interface;
     MessagesHandler *_msg;
-    EndDevice_Lora_Mesh _lora;
-    const int _id;
+    // const int _id;
+    // EndDevice_Lora_Mesh _lora;
 
     static bool _initialized;
     static int _signal_str;

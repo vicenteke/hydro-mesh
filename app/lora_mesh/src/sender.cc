@@ -5,63 +5,57 @@ bool Sender::_initialized = false;
 // EPOS::eMote3_GPRS * Sender::_gprs = 0;
 int Sender::_signal_str = 0;
 
-Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m) //---
+Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
 {
 
     // _pwrkey = new EPOS::GPIO{'C', 4, EPOS::GPIO::OUTPUT};
     // _status = new EPOS::GPIO{'C', 1, EPOS::GPIO::INPUT};
     // _uart = new EPOS::UART{9600, 8, 0, 1, 1};
-    //
+
     // _gprs = new EPOS::eMote3_GPRS{*_pwrkey, *_status, *_uart};
     // _interface->print_message(Interface::MESSAGE::GPRSCREATED, _status->get());
-
-    _lora = EndDevice_Lora_Mesh(_id);
-
-    _interface->print_message(Interface::MESSAGE::GPRSCREATED, true);
 
     kout << "Unsent msgs: " << unsent_messages() << "\n";
 }
 
 
-int Sender::send_data(void * msg, int size)//---
+int Sender::send_data(void * msg, int size)
 {
     // auto sent = _gprs->send_http_post(DATA_SERVER, (const char*) msg, (unsigned int) size);
-    //
-    // if(!sent) {
-    //
-    //     for(unsigned int i = 0; i < 2; i++) {
-    //         _interface->blink_error(Interface::ERROR::TRYINGSENDAGAIN);
-    //
-    //         _gprs->off();
-    //         eMote3_GPTM::delay(200000);
-    //         _gprs->on();
-    //         _gprs->use_dns(); // This parameter is (or should be) reset when the module resets.
-    //
-    //         eMote3_GPTM::delay(EMOTEGPTMLONGDELAY); // Hope for god network is up.
-    //
-    //         sent = _gprs->send_http_post(DATA_SERVER, (const char *) msg, (unsigned int) size);
-    //         if(sent){
-    //             _interface->blink_success(Interface::SUCCESS::MESSAGESENT);
-    //             break;
-    //         }
-    //     }
-    //
-    // }
+    // Change for anything that sends through HTTP
 
-    // return sent;
+    /*if(!sent) {
+        // Try two more times to send
+        for(unsigned int i = 0; i < 2; i++) {
+            _interface->blink_error(Interface::ERROR::TRYINGSENDAGAIN);
 
-    _lora.send((const char*) msg);
-    // May require: ack messages and 3 attempts as before
-    return true;
+            // _gprs->off();
+            Alarm::delay(200000);
+            // _gprs->on();
+            // _gprs->use_dns(); // This parameter is (or should be) reset when the module resets.
+
+            Alarm::delay(EMOTEGPTMLONGDELAY); // Hope for god network is up.
+
+            // sent = _gprs->send_http_post(DATA_SERVER, (const char *) msg, (unsigned int) size);
+            if(sent){
+                _interface->blink_success(Interface::SUCCESS::MESSAGESENT);
+                break;
+            }
+        }
+
+    }
+    return sent;*/
+
+    return true; //---
 }
 
-void Sender::send_or_store() //---!
+void Sender::send_or_store()
 {
     EPOS::OStream x;
     x << "Sending data....\n";
 
     long unsigned int timestamp = 0;
-    // timestamp = getCurrentTime(); ---------------- Must be implemented
+    timestamp = getCurrentTime();
 
     /*
     // block until time is valid (2016 onwards)
@@ -99,7 +93,7 @@ void Sender::send_or_store() //---!
 
 }
 
-void Sender::try_sending_queue() //---
+void Sender::try_sending_queue()
 {
 	EPOS::OStream cout;
 	cout << "Sender::try_sending_queue()\n";
@@ -109,34 +103,33 @@ void Sender::try_sending_queue() //---
 	    char buf[bufSize];
 
         int toSend = (unsent_messages() > SENDING_BATCH_SIZE_MAX)? SENDING_BATCH_SIZE_MAX : unsent_messages();
-        // strcpy(buf, _lora.id());
-        // strcpy(buf, HYDRO_STATION_ID);
+        strcpy(buf, HYDRO_STATION_ID);
 
-        // for(int i = 0; i < toSend; i++) {
-		// 	unsigned int t;
-		// 	unsigned short l, tur;
-		// 	unsigned char p, s;
-		// 	if(i == 0) {
-		// 		_fifo.peek(buf + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
-		// 		char name[5];
-		// 		strncpy(name, buf, 4);
-		// 		name[4] = '\0';
-		// 		t = buf[5] | (buf[6] << 8) | (buf[7] << 16) | (buf[8] << 24);
-		// 		l = buf[9] | (buf[10] << 8);
-		// 		tur = buf[11] | (buf[12] << 8);
-		// 		p = (unsigned char) buf[13];
-		// 		s = (unsigned char) buf[14];
-		// 		cout << "Station name = " << name << " timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
-		// 	} else {
-		// 		_fifo.peek((buf - (FLASH_PADDING * i)) + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
-		// 		int tmp = sizeof(DBEntry) * i + idOffset;
-		// 		t = buf[tmp] | (buf[tmp+1] << 8) | (buf[tmp+2] << 16) | (buf[tmp+3] << 24);
-		// 		l = buf[tmp+4] | (buf[tmp+5] << 8);
-		// 		tur = buf[tmp+6] | (buf[tmp+7] << 8);
-		// 		p = (unsigned char) buf[tmp+8];
-		// 		s = (unsigned char) buf[tmp+9];
-		// 		cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
-		// 	}
+        for(int i = 0; i < toSend; i++) {
+			unsigned int t;
+			unsigned short l, tur;
+			unsigned char p, s;
+			if(i == 0) {
+				_fifo.peek(buf + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
+				char name[5];
+				strncpy(name, buf, 4);
+				name[4] = '\0';
+				t = buf[5] | (buf[6] << 8) | (buf[7] << 16) | (buf[8] << 24);
+				l = buf[9] | (buf[10] << 8);
+				tur = buf[11] | (buf[12] << 8);
+				p = (unsigned char) buf[13];
+				s = (unsigned char) buf[14];
+				cout << "Station name = " << name << " timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
+			} else {
+				_fifo.peek((buf - (FLASH_PADDING * i)) + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
+				int tmp = sizeof(DBEntry) * i + idOffset;
+				t = buf[tmp] | (buf[tmp+1] << 8) | (buf[tmp+2] << 16) | (buf[tmp+3] << 24);
+				l = buf[tmp+4] | (buf[tmp+5] << 8);
+				tur = buf[tmp+6] | (buf[tmp+7] << 8);
+				p = (unsigned char) buf[tmp+8];
+				s = (unsigned char) buf[tmp+9];
+				cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
+			}
 			/*cout << "\n%%%%%%%%%% Printing message before sending:\n";
 			char name[5];
 			strncpy(name, buf, 4);
@@ -146,92 +139,52 @@ void Sender::try_sending_queue() //---
 			unsigned char p = (unsigned char) buf[13];
 			unsigned char s = (unsigned char) buf[14];
 			cout << "Station name = " << name << " timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;*/
-		// }
-
-        // bool sent = send_data(buf, (toSend * (sizeof(DBEntry) + FLASH_PADDING) + idOffset) - (toSend * FLASH_PADDING));  //bufSize-(FLASH_PADDING*toSend)); //less 2 bytes due to flash
-
-        // if(sent) {
-        //     cout << "SENT from fifo\n";
-        //     for(int i = 0; i < toSend; i++)
-        //         _fifo.pop();
-        // } else {
-        //     cout << "SEND FAILED from fifo\n";
-        //     return;
-        // }
-
-        _fifo.peek(buf + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
-
-        unsigned int t;
-        unsigned short l, tur;
-        unsigned char p, s;
-        // char name[5];
-        //
-        // strncpy(name, buf, 4);
-        // name[4] = '\0';
-
-        // t = buf[5] | (buf[6] << 8) | (buf[7] << 16) | (buf[8] << 24);
-        // l = buf[9] | (buf[10] << 8);
-        // tur = buf[11] | (buf[12] << 8);
-        // p = (unsigned char) buf[13];
-        // s = (unsigned char) buf[14];
-        // cout << "Station ID = " << _lora.id() << " timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
-
-        char message[10];
-        for (int j = 0; j < 10; j++) {
-            message[j] = buf[j + 5];
-        }
-        _lora.send(message);
-
-        for(int i = 1; i < toSend; i++) {
-            _fifo.peek((buf - (FLASH_PADDING * i)) + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
-            int tmp = sizeof(DBEntry) * i + idOffset;
-            // t = buf[tmp] | (buf[tmp+1] << 8) | (buf[tmp+2] << 16) | (buf[tmp+3] << 24);
-            // l = buf[tmp+4] | (buf[tmp+5] << 8);
-            // tur = buf[tmp+6] | (buf[tmp+7] << 8);
-            // p = (unsigned char) buf[tmp+8];
-            // s = (unsigned char) buf[tmp+9];
-
-            for (int j = 0; j < 10; j++) {
-                message[j] = buf[j + tmp];
-            }
-
-            _lora.send(message);
 		}
+
+        bool sent = send_data(buf, (toSend * (sizeof(DBEntry) + FLASH_PADDING) + idOffset) - (toSend * FLASH_PADDING));  //bufSize-(FLASH_PADDING*toSend)); //less 2 bytes due to flash
+
+        if(sent) {
+            cout << "SENT from fifo\n";
+            for(int i = 0; i < toSend; i++)
+                _fifo.pop();
+        } else {
+            cout << "SEND FAILED from fifo\n";
+            return;
+        }
     }
 }
 
-bool Sender::init() //---?
+bool Sender::init()
 {
 
     // _gprs->power_on();
     // _gprs->set_baudrate();
-    //
-    // eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY / 2);
-    // if(init_network()) {
-    //     if(init_config()) {
-    //
-    //         _gprs->use_dns();
-    //         enableTimeSincronization();
-    //
-    //         _initialized = true;
-    //
-    //     } else{
-    //         return false;
-    //     }
-    // } else{
-    //     return false;
-    // }
+
+    Alarm::delay(EMOTEGPTMSHORTDELAY / 2);
+    if(init_network()) {
+        if(init_config()) {
+
+            // _gprs->use_dns();
+            enableTimeSincronization();
+
+            _initialized = true;
+
+        } else{
+            return false;
+        }
+    } else{
+        return false;
+    }
     return false;
 }
 
-void Sender::query_signal_strength() //---!
+void Sender::query_signal_strength()
 {
     // if(_initialized)
-    //     _signal_str = _gprs->get_signal_quality();
-    return; //---
+        // _signal_str = _gprs->get_signal_quality();
 }
 
-bool Sender::init_config() //---?
+bool Sender::init_config()
 {
 
     kout << "[Sender::init_config]\n";
@@ -240,13 +193,8 @@ bool Sender::init_config() //---?
     res = false;
     _interface->print_message(Interface::MESSAGE::GPRSSETUP,0);
 
-    //---
-    // Alarm::delay(EMOTEGPTMSHORTDELAY);
-    return true;
-    //---
+    Alarm::delay(EMOTEGPTMSHORTDELAY);
 
-//     eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
-//
 // #if GPRS_USE_AUTH
 //
 //     while(!res) {
@@ -256,7 +204,7 @@ bool Sender::init_config() //---?
 //         if(_status->get()==0)
 //             _gprs->on();
 //
-//         eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+//         Alarm::delay(EMOTEGPTMSHORTDELAY);
 //     }
 //
 // #else
@@ -270,7 +218,7 @@ bool Sender::init_config() //---?
 //         if(_status->get()==0)
 //             _gprs->on();
 //
-//         eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+//         Alarm::delay(EMOTEGPTMSHORTDELAY);
 //     }
 //
 //
@@ -292,24 +240,25 @@ bool Sender::init_config() //---?
 //
 // #endif
 //
-//     if(res)
-//         kout << "success\n";
-//     else
-//         kout << "failure\n";
+//    if(res)
+//        kout << "success\n";
+//    else
+//        kout << "failure\n";
 //
-//     return res;
+//    return res;
+
+    kout << "I guess I'm fine\n";
+    return true;
 }
 
-bool Sender::init_network(){ //---?
-
-    return true; //---
+bool Sender::init_network(){
 
 //     kout << "[Sender::init_network]\n";
 //
 //     bool res = false;//_gprs->sim_card_ready();
 //     unsigned int tmp = 1;
 //
-//     eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+//     Alarm::delay(EMOTEGPTMSHORTDELAY);
 //
 //     while(!res) {
 // #if GPRS_USE_AUTH
@@ -327,7 +276,7 @@ bool Sender::init_network(){ //---?
 // #endif
 //         if(!_status->get())
 //             _gprs->on();
-//         eMote3_GPTM::delay(EMOTEGPTMSHORTDELAY);
+//         Alarm::delay(EMOTEGPTMSHORTDELAY);
 //
 //         tmp++;
 //     }
@@ -338,9 +287,10 @@ bool Sender::init_network(){ //---?
 //         kout << "failure\n";
 //
 //     return res;
+    return true;
 }
 
-void Sender::enableTimeSincronization() //---!
+void Sender::enableTimeSincronization()
 {
     // bool res = false;
     // while(!res) {
@@ -360,8 +310,6 @@ void Sender::enableTimeSincronization() //---!
     //     res = _gprs->await_response("OK", RESPONSETIMEOUT);
     // }
 
-    return; //---
-
     // get current time now
     /*
     char buf[128];
@@ -379,12 +327,12 @@ void Sender::enableTimeSincronization() //---!
 
 #define DECIMAL_AT(X) ( (buf[(X)] - '0')*10 + (buf[(X)+1] - '0') )
 
-long unsigned int Sender::getCurrentTime() //---!
+long unsigned int Sender::getCurrentTime()
 {
     // Example str, includes quotes
     // "16/11/18,19:45:35-08"
 
-    // DateTime dt;
+    DateTime dt;
     // char buf[64];
     // memset(buf, 0, 64);
     //
@@ -404,7 +352,17 @@ long unsigned int Sender::getCurrentTime() //---!
     // } else {
     //     kout << "TIME QUERY FAILED\n";
     // }
+    //
+    // return 0; // we suck
 
-    return 0; // we suck
+    dt.year = 2021;
+    dt.month = 1;
+    dt.date = 1;
+
+    dt.hr = 0;
+    dt.min = 11;
+    dt.sec = 22;
+
+    return unixtime(dt);
 
 }

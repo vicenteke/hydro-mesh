@@ -96,7 +96,7 @@ void Sender::send_or_store()
 void Sender::try_sending_queue()
 {
 	EPOS::OStream cout;
-	cout << "Sender::try_sending_queue()\n";
+	// cout << "Sender::try_sending_queue()\n";
     if( unsent_messages() >= SENDING_BATCH_SIZE ) {
 	    int idOffset = strlen(HYDRO_STATION_ID) + 1;
 	    int bufSize = SENDING_BATCH_SIZE_MAX*(sizeof(DBEntry) + FLASH_PADDING) + idOffset; //plus 2 bytes due to the flash

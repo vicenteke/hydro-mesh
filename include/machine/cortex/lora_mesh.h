@@ -1,3 +1,42 @@
+/*
+ * These classes create an interface for using the Radioenge's LoRaMESH module
+ * (https://www.radioenge.com.br/solucoes/iot/34-modulo-loramesh.html) along with EPOS.
+ * Notice that there is a shield for using it as well, but you can still just connect jumpers.
+ * Also, it does not use default UART pins, so make sure it is properly connected.
+ *
+ * First of all, it is necessary to configure the devices using the software - for Windows - available on
+ * Radioenge's LoRaMESH page ("Software de configuração LoRaMESH") and an FTDI. The configuration is as follows:
+ *      1) Connect to it with the FTDI, really straightforward
+ *      2) LOCAL READ: it gets the UID (Unique IDentifier) of the device
+ *      3) Configure the network characteristics for the device
+ *          ID: for the gateway it must be zero. For the end devices it must be any value from 1 to 2046.
+ *          SENHA/NET: the network number has to be the same for each device.
+ *
+ *          Then click on WRITE CONFIG to store it. You can check if it worked with a LOCAL READ (values
+ *          should remain the same).
+ *      4) Configure the LoRa attributes. Spreading Factor (SF) and Bandwidth (BW) must be the same for
+ *         each node, however it's very likely to set Coding Rate (CR) and Power as the same as well.
+ *         Again, you can check if the values were configured.
+ *
+ *      As an example, here are the values we used:
+ *      NET     = 1562 // Any value from 0 to 2047
+ *      SF      = 12   // Ranges from 7 to 12, or 5 for FSK
+ *      BW      = 125  // 125kHz, 250kHz or 500kHz
+ *      CR      = 4/8  // 4/5, 4/6, 4/7 or 4/8
+ *      POWER   = 20   // Ranges from 0 to 20 dBm
+ *
+ *
+ * CLASSES:
+ *      Lora_Mesh: abstract class, should not be used.
+ *
+ *      Gateway_Lora_Mesh: used for gateways. It does not send data to cloud, it should be implemented.
+ *                         To use it, you should implement a void handler(int id_sender, char* data)
+ *                         function. Then, simply use Gateway_Lora_Mesh gateway(&handler).
+
+ *      EndDevice_Lora_Mesh: used for end devices. Use send(char*) to send data to the gateway.
+ *                           It can also receive data from the GW, so the handler can be implemented too.
+ */
+
 #ifndef __cortex_lora_mesh_h
 #define __cortex_lora_mesh_h
 
@@ -8,7 +47,6 @@
 #include <uart.h>
 #include <gpio.h>
 #include <mutex.h>
-// #include <stdint.h>
 #include <lora_mesh.h>
 
 __BEGIN_SYS
@@ -25,21 +63,6 @@ public:
     static const int LORA_RX_PIN = 6;
     static const int LORA_TX_PIN = 7;
 
-    static const int LORA_SUPPLY_PIN_1 = 5; // Provides power to the LoRa MESH module
-
-    //Commands list
-    static const int MOD_PARAM	   = 0xD6;
-    static const int LOCAL_READ	   = 0xE2;
-    static const int REMOTE_READ   = 0xD4;
-    static const int WRITE_CONFIG  = 0xCA;
-    static const int COMMAND_IO	   = 0xC2;
-    static const int DIAGNOSE	   = 0xE7;
-    static const int NOISE		   = 0xD8;
-    static const int RSSI		   = 0xD5;
-    static const int TRACE_ROUTE   = 0xD2;
-    static const int SEND_PACK	   = 0x28;
-
-    // Commands for Application
     // You can change those values if you need to send those chars
     static const char LORA_MESSAGE_FINAL = '~'; // Marks end of the message
     static const char LORA_GET_NODES = '#'; // Used by getNodesInNet()
@@ -53,184 +76,57 @@ public:
     static const int MASTER_ID     = 0;
     static const int BROADCAST_ID  = 2047;    // Sending to this ID send the command to all the nodes in network
                                             // Can be used only by gateway
-
-    // Configurations for HYDRO_MESH
-    static const int HYDRO_NET     = 1562; // Any value from 0 to 2047
-
-    static const int HYDRO_SF      = 12;  // Ranges from 7 to 12 for SF
-                                        // or 5 = FSK
-
-    static const int HYDRO_BW      = 2;   // 0 = 125kHz
-                                        // 1 = 250kHz
-                                        // 2 = 500kHz
-
-    static const int HYDRO_CR      = 4;   // 1 = 4/5
-                                        // 2 = 4/6
-                                        // 3 = 4/7
-                                        // 4 = 4/8
-
-    static const int HYDRO_POWER   = 20; // Ranges from 0 to 20 dBm
-
 public:
 	Lora_Mesh() {
-	    // In each child class, properly initializes class
-		// Must send feedback about all the steps and notify about errors
-		// After that, device should be ready to make any send()
 
         _transparent = UART(1, 9600, 8, 0, 1);
         _transparent.loopback(false);
-
-        // _command = UART(0, 9600, 8, 0, 1);
-        // _command.loopback(false);
-
-        _checkBit = true;
-
-        turnOn();
-
 	}
 
 	~Lora_Mesh() {}
-
-	//GETTERS
-	// int uid() {
-	// 	return _uid;
-	// }
 
 	int id() {
 		return _id;
 	}
 
-	int net() {
-		return _net;
-	}
-
-	int sf() {
-		return _sf;
-	}
-
-	int bw() {
-		return _bw;
-	}
-
-	int power() {
-		return _power;
-	}
-
-	int cr() {
-		return _cr;
-	}
-
-    bool checkBit() {
-		return _checkBit;
-	}
-
-    // SETTERS
-    // void uid(int uid) {
-    //     _uid = uid;
-    // }
-
     void id(int id) {
         _id = id;
     }
 
-    void net(int net) {
-        _net = net;
-    }
-
-    void sf(int sf) {
-        _sf = sf;
-    }
-
-    void bw(int bw) {
-        _bw = bw;
-    }
-
-    void power(int p) {
-        _power = p;
-    }
-
-    void cr(int cr) {
-        _cr = cr;
-    }
-
-    void checkBit(bool b) {
-        _checkBit = b;
-    }
-
-    static void turnOn() {
-        _supply.set();
-        Alarm::delay(2000000);
-        _isOn = true;
-        _mutex.unlock();
-        cout << "Module is on\n";
-    }
-
-    static void turnOff() {
-        _mutex.lock();
-        _isOn = false;
-        _supply.clear();
-        Alarm::delay(20000);
-        cout << "Module is off\n";
-    }
-
 protected:
 
-	// int _uid;			// unique ID
-	static int _id;			// device's ID
-	int _net;			// network
-	int  _sf;			// spreading factor
-	int  _bw;			// bandwidth
-	int  _cr;			// coding rate
-	int  _power;		// power for antenna
-
-	bool	 _checkBit;		// true if the last operation went successful.
-							// Not appliable to: localRead, getParameters.
-
-	static UART _transparent;		// transparent UART (C5/C6): send/receive data
-	// UART _command;			// command UART (A0/A1): send/receive configuration data and commands
-
+    static int _id;			   // device's ID
+    static UART _transparent;  // transparent UART (C5/C6): send/receive data
+    static GPIO _interrupt;
     static OStream cout;
-    static GPIO _supply; // GPIO that supplies the LoRa module
-    static bool _isOn;
-    static Mutex _mutex; // Guarantees that the LoRa module is on
-
+    static Mutex _mutex;       // Guarantees that the LoRa module is on
 };
 
 class Gateway_Lora_Mesh : public Lora_Mesh {
 
 public:
 
-    Gateway_Lora_Mesh(void (*hand)(int, char *) = &printMessage,
-                    int net = HYDRO_NET,
-                    int sf = HYDRO_SF,
-                    int bw = HYDRO_BW,
-                    int cr = HYDRO_CR,
-                    int power = HYDRO_POWER) {
+    Gateway_Lora_Mesh(void (*hand)(int, char *) = &printMessage) {
 
-    // handler: handler for messages. Receives ID and the message as parameters
+    // hand: handler for messages. Receives ID and the message as parameters
 
+        cout << "Configuring LoRa...\n";
         _id = MASTER_ID;
 
-        _net    = net;
-        _sf     = sf;
-        _bw     = bw;
-        _cr     = cr;
-        _power  = power;
         _nodes.size = 0;
         _nodes.id[0] = -1;
 
         // Initializing interrupts
-        _handler = hand;
         _interrupt.handler(uartHandler, GPIO::FALLING);
-        receiver();
-        getNodesInNet();
+        receiver(hand);
+        // getNodesInNet();
+        cout << "LoRa configured\n";
     }
 
     ~Gateway_Lora_Mesh() {
         stopReceiver();
         cout << "~Gateway() destructor called\n";
     }
-
 
     void send(int id, char* data, int len = 0) {
     // Sends data to node defined by "id"
@@ -254,7 +150,7 @@ public:
     // _interrupt.int_enable();
     }
 
-    void send(int id, char c) {
+    static void send(int id, char c) {
     // Sends char to node defined by "id"
 
         db<Lora_Mesh> (INF) << "Gateway_Lora_Mesh::send(char) called\n";
@@ -336,8 +232,8 @@ public:
 
     // Notice that any function(int, char *) can be passed to constructor to be
     // the handler. Ex: Gateway_Lora_Mesh(&function)
-
-        cout << "Received from " << id << ": " << msg << '\n';
+        OStream kout;
+        kout << "Received from " << id << ": " << msg << '\n';
     }
 
 private:
@@ -345,7 +241,7 @@ private:
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
 
-        // db<Lora_Mesh>(INF) << "[UART Handler] ";
+        // db<Lora_Mesh>(WRN) << "[UART Handler] ";
 
         _mutex.lock();
         _interrupt.int_disable();
@@ -417,38 +313,27 @@ public:
     } nodes_t;
 
 private:
-
     static nodes_t _nodes;
     static void (*_handler)(int, char *);
-    static GPIO _interrupt;
 };
 
 class EndDevice_Lora_Mesh : public Lora_Mesh {
 
 public:
     EndDevice_Lora_Mesh(int id,
-                    void (*hand)(char *) = &printMessage,
-                    int net = HYDRO_NET,
-                    int sf = HYDRO_SF,
-                    int bw = HYDRO_BW,
-                    int cr = HYDRO_CR,
-                    int power = HYDRO_POWER) {
+                    void (*hand)(char *) = &printMessage) {
 
-        // handler: handler for messages from gateway. Receives message as parameter
+        // hand: handler for messages from gateway. Receives message as parameter
 
+        cout << "Configuring LoRa...\n";
         _id = id;
-        _net    = net;
-        _sf     = sf;
-        _bw     = bw;
-        _cr     = cr;
-        _power  = power;
 
         // Initializing interrupts
-        _handler = hand;
         _interrupt.handler(uartHandler, GPIO::FALLING);
-        receiver();
+        receiver(hand);
 
-        send(LORA_GET_NODES); // Tells gateway to list this node in net
+        // send(LORA_GET_NODES); // Tells gateway to list this node in net
+        cout << "LoRa configured\n";
     }
 
     ~EndDevice_Lora_Mesh() {
@@ -515,8 +400,8 @@ public:
     }
 
     static void printMessage(char * msg) {
-
-        cout << "> " << msg << '\n';
+        OStream kout;
+        kout << "> " << msg << '\n';
     }
 
 private:
@@ -576,7 +461,6 @@ private:
 
 private:
     static void (*_handler)(char *);
-    static GPIO _interrupt;
 };
 
 __END_SYS

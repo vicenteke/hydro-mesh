@@ -26,20 +26,19 @@ __BEGIN_SYS
 using namespace EPOS;
 
 // Declaring LoraMesh static members
+GPIO Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
 OStream Lora_Mesh::cout;
 UART Lora_Mesh::_transparent;
-GPIO Lora_Mesh::_supply('D', LORA_SUPPLY_PIN_1, GPIO::OUT);
-bool Lora_Mesh::_isOn = false;
 Mutex Lora_Mesh::_mutex = Mutex();
 int Lora_Mesh::_id;
 
 // Declaring GatewayLoraMesh static members
-GPIO Gateway_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
+// GPIO Gateway_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
 void (*Gateway_Lora_Mesh::_handler)(int, char *);
 Gateway_Lora_Mesh::nodes_t Gateway_Lora_Mesh::_nodes;
 
 // Declaring EndDeviceLoraMesh static members
-GPIO EndDevice_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
+// GPIO EndDevice_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
 void (*EndDevice_Lora_Mesh::_handler)(char *);
 
 __END_SYS

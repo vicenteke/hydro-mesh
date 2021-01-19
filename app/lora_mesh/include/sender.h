@@ -73,7 +73,7 @@ private:
     unsigned long getCurrentTime();
 
 private:
-    Flash_FIFO<sizeof(DBEntry)+FLASH_PADDING> _fifo; // FLASH_PADDING (2) due to the fact that flash only writes a word (4 bytes) and DBEntry has size of 10 bytes
+    static Flash_FIFO<sizeof(DBEntry)+FLASH_PADDING> _fifo; // FLASH_PADDING (2) due to the fact that flash only writes a word (4 bytes) and DBEntry has size of 10 bytes
 
     // static EPOS::eMote3_GPRS *_gprs;
     // EPOS::GPIO *_pwrkey;

@@ -69,7 +69,7 @@ public:
     static const char LORA_REMOVE_NODE = '?'; // Used by ~EndDevice
 
     // Values
-    static const int LORA_TIMEOUT        = 1000000;
+    static const int LORA_TIMEOUT        = 100000;
     static const int LORA_MAX_NODES      = 15; // Used by GW to create _nodes
 
     // ID's
@@ -433,10 +433,10 @@ private:
 
         str[len] = '\0';
 
-        if (str[0] >= 0 && str[0] <= 9) {
+        /*if (str[0] >= 0 && str[0] <= 9) {
             db<Lora_Mesh> (WRN) << "Received message intended to node " << (int)((str[0] << 8) + str[1]) << ":\n";
             strncpy(str, str + 2, strlen(str) - 2);
-        }
+        }*/
 
         if (str[1] == '\0') {
             switch(str[0]) {

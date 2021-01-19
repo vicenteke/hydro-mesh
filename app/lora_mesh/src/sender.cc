@@ -4,6 +4,7 @@
 bool Sender::_initialized = false;
 // EPOS::eMote3_GPRS * Sender::_gprs = 0;
 int Sender::_signal_str = 0;
+Flash_FIFO<sizeof(DBEntry)+Sender::FLASH_PADDING> Sender::_fifo;
 
 Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
 {

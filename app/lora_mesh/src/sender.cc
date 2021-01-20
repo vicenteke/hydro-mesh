@@ -46,8 +46,23 @@ int Sender::send_data(void * msg, int size)
 
     }
     return sent;*/
+    //---
 
-    return true; //---
+    // USB io;
+    // char* message = (char*) msg;
+    // bool was_locked = CPU::int_disabled();
+    // if(!was_locked)
+    //     CPU::int_disable();
+    //
+    // io.put('@');
+    // for (int i = 0; i < size; i++)
+    //     io.put(message[i]);
+    //
+    // io.put('@');
+    // if(!was_locked)
+    //     CPU::int_enable();
+
+    return true;
 }
 
 void Sender::send_or_store()

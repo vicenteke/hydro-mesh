@@ -6,8 +6,6 @@
 
 using namespace EPOS;
 
-USB io;
-
 // Timeout variable
 TSC::Time_Stamp _init_timeout;
 const RTC::Microsecond SEND_DB_SERIES_TIMEOUT = 5ull * 60 * 1000000;
@@ -103,26 +101,8 @@ public:
 
 private:
     T * _data;
+    USB io;
 };
-
-void setup()
-{
-    // Get epoch time from serial
-    TSTP::Time epoch = 0;
-    unsigned int bytes = 0;
-    char c = 0;
-    do {
-        while(!io.ready_to_get());
-        c = io.get();
-    } while(c != 'X');
-    while(bytes < sizeof(TSTP::Time)){
-        while(!io.ready_to_get());
-        c = io.get();
-        epoch |= (static_cast<unsigned long long>(c) << ((bytes++)*8));
-    }
-    TSTP::epoch(epoch);
-    Alarm::delay(5000000);
-}
 
 class Smart_Data_Hydro_Mesh {
 public:

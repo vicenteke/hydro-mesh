@@ -27,14 +27,23 @@
  *
  *
  * CLASSES:
- *      Lora_Mesh: abstract class, should not be used.
+ *      Lora_Mesh: abstract class, should not be used. Each device shall use a single object, either a
+ *                 Gateway_Lora_Mesh or an EndDevice_Lora_Mesh.
  *
  *      Gateway_Lora_Mesh: used for gateways. It does not send data to cloud, it should be implemented.
  *                         To use it, you should implement a void handler(int id_sender, char* data)
  *                         function. Then, simply use Gateway_Lora_Mesh gateway(&handler).
-
+ *
  *      EndDevice_Lora_Mesh: used for end devices. Use send(char*) to send data to the gateway.
  *                           It can also receive data from the GW, so the handler can be implemented too.
+ *
+ * TIME SYNCHRONIZATION:
+ *      Basically, the GW gets the initial timestamp (epoch) - when connecting to the PC, the script
+ *      'loragw' is responsible for that - and uses a timer to count the seconds since epoch. That timer
+ *      has shown a considerable great accuracy during tests.
+ *      The ED gets the timestamp from the GW and counts the seconds in the same way. There might appear
+ *      a small delay - no longer than a few seconds - due to the time-on-air from the messages. It varies
+ *      for different BW and SF, but won't take more than 10 seconds for sure (usually about 2s for SF 12).
  */
 
 #ifndef __cortex_lora_mesh_h
@@ -48,11 +57,94 @@
 #include <gpio.h>
 #include <mutex.h>
 #include <lora_mesh.h>
+#include <timer.h>
 
 __BEGIN_SYS
 
 using namespace EPOS;
 
+// Timers
+class GW_Timer {
+// Uses timer and connects to PC in order to get proper timestamp
+
+public:
+    GW_Timer() {
+        _count = 0;
+        _epoch = 0;
+        getEpoch();
+        _timer = new User_Timer(0, 1000000, &handler, true);
+    }
+
+    ~GW_Timer() {
+        delete _timer;
+    }
+
+    void getEpoch() {
+        // Gets epoch from PC (loragw script should be running)
+        unsigned long long epoch = 0;
+        unsigned int bytes = 0;
+        char c = 0;
+        io.put('@');
+        do {
+            while(!io.ready_to_get());
+            c = io.get();
+        } while(c != 'X');
+        while(bytes < sizeof(unsigned long long)){
+            while(!io.ready_to_get());
+            c = io.get();
+            epoch |= (static_cast<unsigned long long>(c) << ((bytes++)*8));
+        }
+
+        _epoch = epoch;
+        _count = 0;
+    }
+
+    unsigned long long count() { return _count; }
+    unsigned long long epoch() { return _epoch; }
+    unsigned long long currentTime() { return _count + _epoch;}
+
+private:
+
+    USB io;                           // Connection to PC
+
+    User_Timer* _timer;               // Increments _count every second
+    static unsigned long long _count; // Seconds since _epoch
+    unsigned long long _epoch;        // Starter time
+
+    static void handler(const unsigned int &) { _count += 1; }
+};
+
+class ED_Timer {
+// Counts elapsed time since epoch (obtained from GW)
+
+public:
+    ED_Timer() {
+        _count = 0;
+        _epoch = 0;
+        _timer = new User_Timer(0, 1000000, &handler, true);
+    }
+    ~ED_Timer() {
+        delete _timer;
+    }
+
+    void reset() { _count = 0; }
+
+    void epoch(unsigned long long t) { _epoch = t; }
+
+    unsigned long long count() { return _count; }
+    unsigned long long epoch() { return _epoch; }
+    unsigned long long currentTime() { return _count + _epoch;}
+
+private:
+
+    User_Timer* _timer;               // Increments _count every second
+    static unsigned long long _count; // Seconds since _epoch
+    unsigned long long _epoch;        // Starter time
+
+    static void handler(const unsigned int &) { _count += 1; }
+};
+
+// LoRa Classes
 class Lora_Mesh : public Lora_Mesh_Common {
 public:
     // CONSTANTS DECLARATION
@@ -63,10 +155,9 @@ public:
     static const int LORA_RX_PIN = 6;
     static const int LORA_TX_PIN = 7;
 
-    // You can change those values if you need to send those chars
-    static const char LORA_MESSAGE_FINAL = '~'; // Marks end of the message
-    static const char LORA_GET_NODES = '#'; // Used by getNodesInNet()
-    static const char LORA_REMOVE_NODE = '?'; // Used by ~EndDevice
+    // You can change those values if you have to send these chars
+    static const char LORA_MESSAGE_FINAL  = '~'; // Marks end of the message
+    static const char LORA_SEND_TIMESTAMP = '#'; // Used by getNodesInNet()
 
     // Values
     static const int LORA_TIMEOUT        = 100000;
@@ -113,19 +204,20 @@ public:
         cout << "Configuring LoRa...\n";
         _id = MASTER_ID;
 
-        _nodes.size = 0;
-        _nodes.id[0] = -1;
+        // Initializing timer
+        _timer = new GW_Timer();
 
         // Initializing interrupts
         _interrupt.handler(uartHandler, GPIO::FALLING);
         receiver(hand);
-        // getNodesInNet();
+
         cout << "LoRa configured\n";
     }
 
     ~Gateway_Lora_Mesh() {
+        db<Lora_Mesh>(WRN) << "~Gateway() destructor called\n";
         stopReceiver();
-        cout << "~Gateway() destructor called\n";
+        delete _timer;
     }
 
     void send(int id, char* data, int len = 0) {
@@ -136,7 +228,6 @@ public:
         if (len <= 0)
             len = strlen(data);
 
-    // _interrupt.int_disable();
         // if(!_isOn) turnOn();
         _mutex.lock();
     	_transparent.put(id & 0xFF);
@@ -147,7 +238,6 @@ public:
     	}
         _transparent.put(LORA_MESSAGE_FINAL);
         _mutex.unlock();
-    // _interrupt.int_enable();
     }
 
     static void send(int id, char c) {
@@ -172,35 +262,22 @@ public:
         send(BROADCAST_ID, data, len);
     }
 
-    void getNodesInNet() {
-    // Gets the ID's of the nodes in the network
-
-        db<Lora_Mesh> (INF) << "Gateway_Lora_Mesh::getNodesInNet() called\n";
-
-        for (int i = 0; i < _nodes.size; i++) {
-            _nodes.id[i] = -1;
-        }
-        _nodes.size = 0;
-
-        send(BROADCAST_ID, LORA_GET_NODES);
-    }
-
-    static void removeNode(int id) {
-        // Removes node from _nodes
-
-        if(_nodes.size == 0) return;
-
-        int i;
-        for (i = 0; i <= _nodes.size; i++)
-            if (id == _nodes.id[i])
-                break;
-
-        while (i <= _nodes.size) {
-            _nodes.id[i] = _nodes.id[i+1];
-            i++;
+    static void sendTimestamp(int id) {
+        char ts[8];
+        unsigned long long current = _timer->currentTime();
+        for (int i = 0; i < 8; i++) {
+            ts[i] = (current >> (i * 8) & 0xFF);
         }
 
-        _nodes.size -= 1;
+        // Sending
+    	_transparent.put(id & 0xFF);
+    	_transparent.put((id >> 8) & 0xFF);
+    	_transparent.put(LORA_SEND_TIMESTAMP);
+
+    	for (int i = 0 ; i < 8 ; i++) {
+    		_transparent.put(ts[i]);
+    	}
+        _transparent.put(LORA_MESSAGE_FINAL);
     }
 
     void receiver(void (*handler)(int, char *) = 0) {
@@ -235,6 +312,8 @@ public:
         OStream kout;
         kout << "Received from " << id << ": " << msg << '\n';
     }
+
+    GW_Timer* timer() { return _timer; }
 
 private:
 
@@ -276,11 +355,8 @@ private:
         // Looking for commands
         if (str[1] == '\0') {
             switch(str[0]) {
-                case LORA_GET_NODES:
-                    addNode((id[0] << 8) + id[1]);
-                    break;
-                case LORA_REMOVE_NODE:
-                    removeNode((id[0] << 8) + id[1]);
+                case LORA_SEND_TIMESTAMP:
+                    sendTimestamp((id[0] << 8) + id[1]);
                     break;
                 default:
                     _handler(((id[0] << 8) + id[1]), str);
@@ -294,34 +370,15 @@ private:
         _mutex.unlock();
     }
 
-    static void addNode(int id) {
-
-        _nodes.id[_nodes.size++] = id;
-
-        cout << _nodes.size << " nodes in net:";
-
-        for (int i = 0; i < _nodes.size; i++)
-            cout << " ["<< _nodes.id[i] << ']';
-
-        cout << '\n';
-    }
-
-public:
-    typedef struct nodes { // Stores the ID's of nodes in the net
-        int size;
-        int id[LORA_MAX_NODES];
-    } nodes_t;
-
 private:
-    static nodes_t _nodes;
     static void (*_handler)(int, char *);
+    static GW_Timer* _timer;
 };
 
 class EndDevice_Lora_Mesh : public Lora_Mesh {
 
 public:
-    EndDevice_Lora_Mesh(int id,
-                    void (*hand)(char *) = &printMessage) {
+    EndDevice_Lora_Mesh(int id, void (*hand)(char *) = &printMessage) {
 
         // hand: handler for messages from gateway. Receives message as parameter
 
@@ -332,15 +389,25 @@ public:
         _interrupt.handler(uartHandler, GPIO::FALLING);
         receiver(hand);
 
+        // Initializing timer
+        _timer = new ED_Timer();
+        cout << "Awaiting for timestamp from GW...\n";
+        while (_timer->epoch() == 0) {
+            send(LORA_SEND_TIMESTAMP);
+            Alarm::delay(6000000);
+        }
+
+        cout << "Timestamp received: " << _timer->epoch() << endl;
+
         // send(LORA_GET_NODES); // Tells gateway to list this node in net
         cout << "LoRa configured\n";
     }
 
     ~EndDevice_Lora_Mesh() {
-        send(LORA_REMOVE_NODE);
+        db<Lora_Mesh>(WRN) << "~EndDevice() destructor called\n";
         stopReceiver();
+        delete _timer;
     }
-
 
     void send(char* data, int len = 0) {
     // Sends data to gateway
@@ -404,6 +471,8 @@ public:
         kout << "> " << msg << '\n';
     }
 
+    ED_Timer* timer() { return _timer; }
+
 private:
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
@@ -438,19 +507,13 @@ private:
             strncpy(str, str + 2, strlen(str) - 2);
         }*/
 
-        if (str[1] == '\0') {
-            switch(str[0]) {
-                case LORA_GET_NODES:
-                    // Alarm::delay(_id * 1000);
-                    for (int k = 0; k < _id * 1000; k++);
-                    _mutex.unlock();
-                    send(LORA_GET_NODES);
-                    _mutex.lock();
-                    break;
-                default:
-                    _handler(str);
-                    break;
+        if (str[0] == LORA_SEND_TIMESTAMP) {
+            unsigned long long ts = 0;
+            for (int j = 0; j < 8; j++) {
+                ts |= str[j+1] << (8 * j);
             }
+            _timer->epoch(ts);
+            _timer->reset();
         } else
             _handler(str);
 
@@ -461,6 +524,7 @@ private:
 
 private:
     static void (*_handler)(char *);
+    static ED_Timer* _timer;
 };
 
 __END_SYS

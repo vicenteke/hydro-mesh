@@ -92,25 +92,26 @@ def init_mote():
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print("Exception caught:", e, file=sys.stderr)
+            # print("Exception caught:", e, file=sys.stderr)
             ok = False
             time.sleep(3)
 
     # print("Mote open", file=sys.stderr)
     if(SETUP):
-        ts = int(time.time() * 1000000)
-        print(int(ts/1000000))
+        # ts = int(time.time() * 1000000)
+        ts = int(time.time()) # Sent in seconds
+        print(int(ts))
         str_ts = bytearray(8)
         pack_into('<Q', str_ts, 0, ts)
         try:
             mote.write(b'YYYX'+str_ts)
-            print("epoch written", file=sys.stderr)
+            # print("epoch written", file=sys.stderr)
         except KeyboardInterrupt:
             raise
         except serial.serialutil.SerialTimeoutException:
             pass
 
-    print("init_mote() done", file=sys.stderr)
+    # print("init_mote() done", file=sys.stderr)
     return mote
 
 def series_to_json(data):
@@ -243,11 +244,11 @@ class PublisherThread(Thread):
                             response = session.post(URL, payload)
                             print("Put [", str(response.status_code), "] (", len(payload), ") ", payload, sep='')
                         count = 0
-                else:
-                    print("Invalid data: ", data, file=sys.stderr)
+                # else:
+                    # print("Invalid data: ", data, file=sys.stderr)
             except Exception as e:
                 mote.close()
-                print("Exception caught:", e, file=sys.stderr)
+                # print("Exception caught:", e, file=sys.stderr)
 
             to_be_published.task_done()
 
@@ -258,7 +259,7 @@ class ParserThread(Thread):
 
         while True:
             entry = to_be_parsed.get()
-            # print("To_be_parsed Queue size: ", to_be_parsed.qsize())
+            #print("To_be_parsed Queue size: ", to_be_parsed.qsize())
             db_x = entry['db_x']
             data = entry['data']
 
@@ -269,10 +270,10 @@ class ParserThread(Thread):
                 elif db_x == b'R': # DB_Record
                     if JSON:
                         data = smartdata_to_json(data)
-                else:
-                    print("Invalid data: ", data, file=sys.stderr)
+                # else:
+                    # print("Invalid data: ", data, file=sys.stderr)
             except Exception as e:
-                print("Exception caught:", e, file=sys.stderr)
+                print("Exception caught:", e)
             to_be_published.put({'db_x' : db_x, 'data' : data})
             to_be_parsed.task_done()
 
@@ -298,7 +299,7 @@ class ReceiverThread(Thread):
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                print("Exception caught:", e, file=sys.stderr)
+                # print("Exception caught:", e, file=sys.stderr)
                 data = b''
 
             if X == 3 and len(data):
@@ -312,7 +313,24 @@ class ReceiverThread(Thread):
 
             # time.sleep(0.8)
 
+class GetTimeThread(Thread):
+    def run(self):
+        mote = init_mote()
+        while True:
+            try:
+                byte = mote.read(1)
+                if byte == b'@':
+                    mote.close()
+                    mote = init_mote()
+                else:
+                    print(byte.decode("utf-8"), end="")
+
+            except KeyboardInterrupt:
+                raise
+
 if __name__ == "__main__":
-    ReceiverThread().start()
-    ParserThread().start()
-    PublisherThread().start()
+    # ReceiverThread().start()
+#     ParserThread().start()
+#     PublisherThread().start()
+
+    GetTimeThread().start()

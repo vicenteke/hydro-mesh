@@ -20,6 +20,7 @@
 // #include <machine/cortex_m/emote3_gptm.h>
 #include <alarm.h>
 #include <semaphore.h>
+#include <utility/string.h>
 
 #include "defines.h"
 
@@ -38,7 +39,7 @@ struct DBEntry
     uint8_t plu;
     uint8_t usr;
 
-} __attribute__((packed));
+}__attribute__((packed));
 
 class MessagesHandler
 {
@@ -46,6 +47,7 @@ public:
 
     MessagesHandler();
 
+    void setTime(uint32_t time) { m_entry.timestamp = time; }
     void setLvl(uint16_t lvl) { m_entry.lvl = lvl; }
     void setTur(uint16_t tur) { m_entry.tur = tur; }
     void setPlu(uint8_t plu) { m_entry.plu = plu; }
@@ -57,7 +59,17 @@ public:
      */
     int build(void * dest);
 
-    void setTime(long unsigned int time) { m_entry.timestamp = time; }
+    /**
+     * builds a string as
+     *      dest[3-0] = timestamp
+     *      dest[5-4] = level
+     *      dest[7-6] = turb
+     *      dest[8]   = pluv
+     *      dest[9]   = usr
+     * @returns the length of dest
+     */
+    int toString(char dest[]);
+
     void dump();
 
 private:

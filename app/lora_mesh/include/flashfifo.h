@@ -48,31 +48,31 @@ public:
     void init()
     {
         // read header
-        kout << "[Flash_FIFO::init]\n";
+        // kout << "[Flash_FIFO::init]\n";
         Flash::read(FLASH_BASE, reinterpret_cast<unsigned int*>(&m_head), HEADER_SIZE); // reads header in memory
 
         // try to validate whats in it
         if(strcmp(getMagic(), m_head.magic))
         {
-            kout << "[Flash_FIFO::init] magic mismatch\n";
+            // kout << "[Flash_FIFO::init] magic mismatch\n";
             clear();
             return;
         }
 
         if(m_head.pos > CAPACITY || m_head.s > CAPACITY)
         {
-            kout << "[Flash_FIFO::init] header corrupt\n";
+            // kout << "[Flash_FIFO::init] header corrupt\n";
             clear();
             return;
         }
 
         // header assumed valid now, we are done
-        kout << "[Flash_FIFO::init] header valid\n";
+        // kout << "[Flash_FIFO::init] header valid\n";
     }
 
     void clear()
     {
-        kout << "[Flash_FIFO::clear]\n";
+        // kout << "[Flash_FIFO::clear]\n";
         // write zero to everything
 
         strcpy( m_head.magic, getMagic());
@@ -169,7 +169,7 @@ private:
 
     void flushHeader()
     {
-        kout << "[Flash_FIFO::flushHeader]\n";
+        // kout << "[Flash_FIFO::flushHeader]\n";
         Flash::write(FLASH_BASE, reinterpret_cast<unsigned int*>(&m_head), HEADER_SIZE); // writes header to flash
     }
 

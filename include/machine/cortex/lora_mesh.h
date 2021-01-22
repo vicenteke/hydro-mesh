@@ -39,11 +39,10 @@
  *
  * TIME SYNCHRONIZATION:
  *      Basically, the GW gets the initial timestamp (epoch) - when connecting to the PC, the script
- *      'loragw' is responsible for that - and uses a timer to count the seconds since epoch. That timer
- *      has shown a considerable great accuracy during tests.
+ *      'loragw' is responsible for that - and uses a timer to count the seconds since epoch.
  *      The ED gets the timestamp from the GW and counts the seconds in the same way. There might appear
- *      a small delay - no longer than a few seconds - due to the time-on-air from the messages. It varies
- *      for different BW and SF, but won't take more than 10 seconds for sure (usually about 2s for SF 12).
+ *      a small delay - usually no longer than a few seconds - due to the time-on-air from the messages and some
+ *      imprecision from timers.
  */
 
 #ifndef __cortex_lora_mesh_h
@@ -157,6 +156,7 @@ public:
 
     // You can change those values if you have to send these chars
     static const char LORA_MESSAGE_FINAL  = '~'; // Marks end of the message
+    static const int  LORA_FINAL_COUNT     =  4; // Number of times LORA_MESSAGE_FINAL is repeated
     static const char LORA_SEND_TIMESTAMP = '#'; // Used by getNodesInNet()
 
     // Values
@@ -236,7 +236,10 @@ public:
     	for (int i = 0 ; i < len ; i++) {
     		_transparent.put(data[i]);
     	}
-        _transparent.put(LORA_MESSAGE_FINAL);
+
+        for (int i = 0; i < LORA_FINAL_COUNT; i++) {
+            _transparent.put(LORA_MESSAGE_FINAL);
+        }
         _mutex.unlock();
     }
 
@@ -251,7 +254,9 @@ public:
     	_transparent.put(id & 0xFF);
     	_transparent.put((id >> 8) & 0xFF);
         _transparent.put(c);
-        _transparent.put(LORA_MESSAGE_FINAL);
+        for (int i = 0; i < LORA_FINAL_COUNT; i++) {
+            _transparent.put(LORA_MESSAGE_FINAL);
+        }
 
         _mutex.unlock();
     }
@@ -277,7 +282,10 @@ public:
     	for (int i = 0 ; i < 8 ; i++) {
     		_transparent.put(ts[i]);
     	}
-        _transparent.put(LORA_MESSAGE_FINAL);
+
+        for (int i = 0; i < LORA_FINAL_COUNT; i++) {
+            _transparent.put(LORA_MESSAGE_FINAL);
+        }
     }
 
     void receiver(void (*handler)(int, char *) = 0) {
@@ -328,9 +336,11 @@ private:
         char str[30];
         str[0] = '\0';
 
-        int len = 0;
+        unsigned int len = 0;
         char buf = '0';
         int id[] = {10, 10};
+        int count = 0;
+        bool sequence = false;
         int i = 0;
 
         // Getting data
@@ -339,13 +349,28 @@ private:
         id[0] = _transparent.get();
 
         while (!_transparent.ready_to_get());
-        while(_transparent.ready_to_get() && len <= 30) {
+        while(_transparent.ready_to_get() && len <= 30 && count < LORA_FINAL_COUNT) {
             buf = _transparent.get();
-            if(buf != '\0' && buf != LORA_MESSAGE_FINAL)
-                str[len++] = buf;
+            str[len++] = buf;
+
+            // Verify end of message
+            if (sequence) {
+                if (buf == LORA_MESSAGE_FINAL) {
+                    count++;
+                    if (count == LORA_FINAL_COUNT) {
+                        len -= LORA_FINAL_COUNT;
+                    }
+                } else {
+                    count = 0;
+                    sequence = false;
+                }
+            } else if (buf == LORA_MESSAGE_FINAL) {
+                count = 1;
+                sequence = true;
+            }
 
             i = 0;
-            while (buf != LORA_MESSAGE_FINAL && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
+            while (count < LORA_FINAL_COUNT && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
             if (i >= LORA_TIMEOUT)
                 db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
         }
@@ -409,7 +434,7 @@ public:
         delete _timer;
     }
 
-    void send(char* data, int len = 0) {
+    void send(char data[], int len = 0) {
     // Sends data to gateway
 
     	db<Lora_Mesh> (INF) << "EndDevice_Lora_Mesh::send() called\n";
@@ -424,7 +449,10 @@ public:
     		_transparent.put(data[i]);
     	}
 
-        _transparent.put(LORA_MESSAGE_FINAL);
+        for (int i = 0; i < LORA_FINAL_COUNT; i++) {
+            _transparent.put(LORA_MESSAGE_FINAL);
+        }
+
         _mutex.unlock();
     }
 
@@ -437,7 +465,9 @@ public:
         _mutex.lock();
 
 		_transparent.put(c);
-        _transparent.put(LORA_MESSAGE_FINAL);
+        for (int i = 0; i < LORA_FINAL_COUNT; i++) {
+            _transparent.put(LORA_MESSAGE_FINAL);
+        }
 
         _mutex.unlock();
     }
@@ -485,17 +515,35 @@ private:
         char str[30];
         str[0] = '\0';
 
-        int len = 0;
+        unsigned int len = 0;
         char buf = '0';
+        int count = 0;
+        bool sequence = false;
         int i = 0;
 
         while (!_transparent.ready_to_get());
         while(_transparent.ready_to_get() && len <= 30) {
             buf = _transparent.get();
-            if(buf != '\0' && buf != LORA_MESSAGE_FINAL)
-                str[len++] = buf;
+            str[len++] = buf;
+
+            // Verify end of message
+            if (sequence) {
+                if (buf == LORA_MESSAGE_FINAL) {
+                    count++;
+                    if (count == LORA_FINAL_COUNT) {
+                        len -= LORA_FINAL_COUNT;
+                    }
+                } else {
+                    count = 0;
+                    sequence = false;
+                }
+            } else if (buf == LORA_MESSAGE_FINAL) {
+                count = 1;
+                sequence = true;
+            }
+
             i = 0;
-            while (buf != LORA_MESSAGE_FINAL && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT); // 4000: minimum delay tested for sf = 12, bw = 500, cr = 4/8
+            while (count < LORA_FINAL_COUNT && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
             if (i >= LORA_TIMEOUT)
                 db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
         }
@@ -507,7 +555,7 @@ private:
             strncpy(str, str + 2, strlen(str) - 2);
         }*/
 
-        if (str[0] == LORA_SEND_TIMESTAMP) {
+        if (str[0] == LORA_SEND_TIMESTAMP && len < (sizeof(unsigned long long) + 2)) {
             unsigned long long ts = 0;
             for (int j = 0; j < 8; j++) {
                 ts |= str[j+1] << (8 * j);

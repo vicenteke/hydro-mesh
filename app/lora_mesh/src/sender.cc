@@ -70,8 +70,8 @@ void Sender::send_or_store()
     EPOS::OStream x;
     x << "Sending data....\n";
 
-    long unsigned int timestamp = 0;
-    timestamp = getCurrentTime();
+    // long unsigned int timestamp = 0;
+    // timestamp = getCurrentTime();
 
     /*
     // block until time is valid (2016 onwards)
@@ -84,7 +84,7 @@ void Sender::send_or_store()
     }
     */
     //x << "Setting message timestamp = " << timestamp << endl;
-    _msg->setTime(timestamp);
+    // _msg->setTime(timestamp);
 
 	/*
 	BIG WARNING HERE: flash only writes a word (4 bytes) and DBEntry has 10 bytes. We write to the flash always 12 bytes, but we use only 10 bytes in fact
@@ -160,11 +160,11 @@ void Sender::try_sending_queue()
         bool sent = send_data(buf, (toSend * (sizeof(DBEntry) + FLASH_PADDING) + idOffset) - (toSend * FLASH_PADDING));  //bufSize-(FLASH_PADDING*toSend)); //less 2 bytes due to flash
 
         if(sent) {
-            cout << "SENT from fifo\n";
+            // cout << "SENT from fifo\n";
             for(int i = 0; i < toSend; i++)
                 _fifo.pop();
         } else {
-            cout << "SEND FAILED from fifo\n";
+            // cout << "SEND FAILED from fifo\n";
             return;
         }
     }

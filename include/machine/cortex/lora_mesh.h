@@ -57,6 +57,7 @@
 #include <mutex.h>
 #include <lora_mesh.h>
 #include <timer.h>
+#include <tstp.h>
 
 __BEGIN_SYS
 
@@ -156,12 +157,13 @@ public:
 
     // You can change those values if you have to send these chars
     static const char LORA_MESSAGE_FINAL  = '~'; // Marks end of the message
-    static const int  LORA_FINAL_COUNT     =  4; // Number of times LORA_MESSAGE_FINAL is repeated
     static const char LORA_SEND_TIMESTAMP = '#'; // Used by getNodesInNet()
 
     // Values
-    static const int LORA_TIMEOUT        = 100000;
-    static const int LORA_MAX_NODES      = 15; // Used by GW to create _nodes
+    static const int LORA_TIMEOUT             = 100000;
+    static const int LORA_MAX_NODES           = 15; // Used by GW to create _nodes
+    static const int LORA_FINAL_COUNT         =  4; // Number of times LORA_MESSAGE_FINAL is repeated
+    static const unsigned int LORA_MAX_LENGTH = 40; // Max length for message
 
     // ID's
     static const int MASTER_ID     = 0;
@@ -333,7 +335,7 @@ private:
         _mutex.lock();
         _interrupt.int_disable();
 
-        char str[30];
+        char str[LORA_MAX_LENGTH];
         str[0] = '\0';
 
         unsigned int len = 0;
@@ -349,7 +351,7 @@ private:
         id[0] = _transparent.get();
 
         while (!_transparent.ready_to_get());
-        while(_transparent.ready_to_get() && len <= 30 && count < LORA_FINAL_COUNT) {
+        while(_transparent.ready_to_get() && len <= LORA_MAX_LENGTH && count < LORA_FINAL_COUNT) {
             buf = _transparent.get();
             str[len++] = buf;
 
@@ -403,12 +405,15 @@ private:
 class EndDevice_Lora_Mesh : public Lora_Mesh {
 
 public:
-    EndDevice_Lora_Mesh(int id, void (*hand)(char *) = &printMessage) {
+    EndDevice_Lora_Mesh(int id, int x = 0, int y = 0, int z = 0, void (*hand)(char *) = &printMessage) {
 
         // hand: handler for messages from gateway. Receives message as parameter
 
         cout << "Configuring LoRa...\n";
         _id = id;
+        _x = x;
+        _y = y;
+        _z = z;
 
         // Initializing interrupts
         _interrupt.handler(uartHandler, GPIO::FALLING);
@@ -427,6 +432,40 @@ public:
         // send(LORA_GET_NODES); // Tells gateway to list this node in net
         cout << "LoRa configured\n";
     }
+
+    /*EndDevice_Lora_Mesh(int id, Coordinates r = 0, void (*hand)(char *) = &printMessage) {
+
+        // hand: handler for messages from gateway. Receives message as parameter
+
+        cout << "Configuring LoRa...\n";
+        _id = id;
+        if (r) {
+            _x = r.x;
+            _y = r.y;
+            _z = rs.z;
+        } else {
+            _x = 0;
+            _y = 0;
+            _z = 0;
+        }
+
+        // Initializing interrupts
+        _interrupt.handler(uartHandler, GPIO::FALLING);
+        receiver(hand);
+
+        // Initializing timer
+        _timer = new ED_Timer();
+        cout << "Awaiting for timestamp from GW...\n";
+        while (_timer->epoch() == 0) {
+            send(LORA_SEND_TIMESTAMP);
+            Alarm::delay(6000000);
+        }
+
+        cout << "Timestamp received: " << _timer->epoch() << endl;
+
+        // send(LORA_GET_NODES); // Tells gateway to list this node in net
+        cout << "LoRa configured\n";
+    }*/
 
     ~EndDevice_Lora_Mesh() {
         db<Lora_Mesh>(WRN) << "~EndDevice() destructor called\n";
@@ -503,6 +542,10 @@ public:
 
     ED_Timer* timer() { return _timer; }
 
+    int x() { return _x; }
+    int y() { return _y; }
+    int z() { return _z; }
+
 private:
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
@@ -512,7 +555,7 @@ private:
         _mutex.lock();
         _interrupt.int_disable();
 
-        char str[30];
+        char str[LORA_MAX_LENGTH];
         str[0] = '\0';
 
         unsigned int len = 0;
@@ -522,7 +565,7 @@ private:
         int i = 0;
 
         while (!_transparent.ready_to_get());
-        while(_transparent.ready_to_get() && len <= 30) {
+        while(_transparent.ready_to_get() && len <= LORA_MAX_LENGTH) {
             buf = _transparent.get();
             str[len++] = buf;
 
@@ -573,6 +616,8 @@ private:
 private:
     static void (*_handler)(char *);
     static ED_Timer* _timer;
+
+    int _x, _y, _z;
 };
 
 __END_SYS

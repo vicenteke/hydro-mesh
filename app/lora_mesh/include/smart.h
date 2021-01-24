@@ -6,6 +6,10 @@
 
 using namespace EPOS;
 
+enum {
+    MAX_NODES = 40
+};
+
 // Timeout variable
 TSC::Time_Stamp _init_timeout;
 const RTC::Microsecond SEND_DB_SERIES_TIMEOUT = 5ull * 60 * 1000000;
@@ -102,6 +106,65 @@ public:
 private:
     T * _data;
     USB io;
+};
+
+/*
+ * Stores series already created based on received "Usr"
+ * Obs: creating the series is up to the application
+ */
+class Series_Logger {
+public:
+    Series_Logger() {
+        _length = 0;
+        for (int i = 0; i < MAX_NODES; i++) {
+            _log[i] = -1;
+        }
+    }
+
+    ~Series_Logger() {}
+
+    /*
+     * Checks if series 'usr' has been created; if hasn't, stores 'usr' in _log
+     *
+     * @return false if 'usr' was already in _log, true if it was stored in _log
+     */
+    int add(int usr) {
+
+        for (int i = 0; i < _length; i++) {
+            if (usr == _log[i]) return false;
+        }
+
+        _log[_length++] = usr;
+        return true;
+    }
+
+    /*
+     * Removes 'usr' from _log
+     *
+     * @return false if 'usr' wasn't in _log, true if it was removed
+     */
+    int remove(int usr) {
+        bool found = false;
+        for (int i = 0; i < _length; i++) {
+            if (found) {
+                _log[i] = _log[i + 1];
+            } else if (usr == _log[i]) {
+                found = true;
+                _log[i] = _log[i + 1];
+            }
+        }
+        if (found) {
+            _log[_length--] = -1
+        }
+
+        return found;
+    }
+
+    int length() { return _length; }
+
+private:
+    int _log[MAX_NODES];
+    unsigned short _length;
 };
 
 class Smart_Data_Hydro_Mesh {

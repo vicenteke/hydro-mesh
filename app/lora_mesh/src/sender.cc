@@ -125,6 +125,7 @@ void Sender::try_sending_queue()
 			unsigned int t;
 			unsigned short l, tur;
 			unsigned char p, s;
+            int x, y, z;
 			if(i == 0) {
 				_fifo.peek(buf + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
 				char name[5];
@@ -135,7 +136,12 @@ void Sender::try_sending_queue()
 				tur = buf[11] | (buf[12] << 8);
 				p = (unsigned char) buf[13];
 				s = (unsigned char) buf[14];
-				cout << "Station name = " << name << " timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
+                x = buf[15] | (buf[16] << 8) | (buf[17] << 16) | (buf[18] << 24);
+                y = buf[19] | (buf[20] << 8) | (buf[21] << 16) | (buf[22] << 24);
+                z = buf[23] | (buf[24] << 8) | (buf[25] << 16) | (buf[26] << 24);
+				cout << "Station name = " << name << " timestamp = " << t << " level = " << l
+                    << " tur = " << tur << " plu = " << p << " signal = " << s
+                    << "coord = " << x << ", " << y << ", " << z << endl;
 			} else {
 				_fifo.peek((buf - (FLASH_PADDING * i)) + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
 				int tmp = sizeof(DBEntry) * i + idOffset;
@@ -144,7 +150,12 @@ void Sender::try_sending_queue()
 				tur = buf[tmp+6] | (buf[tmp+7] << 8);
 				p = (unsigned char) buf[tmp+8];
 				s = (unsigned char) buf[tmp+9];
-				cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
+                x = buf[tmp+10] | (buf[tmp+11] << 8) | (buf[tmp+12] << 16) | (buf[tmp+13] << 24);
+                y = buf[tmp+14] | (buf[tmp+15] << 8) | (buf[tmp+16] << 16) | (buf[tmp+17] << 24);
+                z = buf[tmp+18] | (buf[tmp+19] << 8) | (buf[tmp+20] << 16) | (buf[tmp+21] << 24);
+
+				cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s
+                << "coord = " << x << ", " << y << ", " << z  << endl;
 			}
 			/*cout << "\n%%%%%%%%%% Printing message before sending:\n";
 			char name[5];
@@ -203,7 +214,7 @@ void Sender::query_signal_strength()
 bool Sender::init_config()
 {
 
-    kout << "[Sender::init_config]\n";
+    // kout << "[Sender::init_config]\n";
 
     bool res;
     res = false;
@@ -263,7 +274,6 @@ bool Sender::init_config()
 //
 //    return res;
 
-    kout << "I guess I'm fine\n";
     return true;
 }
 

@@ -38,6 +38,9 @@ struct DBEntry
     uint16_t tur;
     uint8_t plu;
     uint8_t usr;
+    int x;
+    int y;
+    int z;
 
 }__attribute__((packed));
 
@@ -52,6 +55,9 @@ public:
     void setTur(uint16_t tur) { m_entry.tur = tur; }
     void setPlu(uint8_t plu) { m_entry.plu = plu; }
     void setUsr(uint8_t usr) { m_entry.usr = usr; }
+    void setX(int x) { m_entry.x = x; }
+    void setY(int y) { m_entry.y = y; }
+    void setZ(int z) { m_entry.z = z; }
 
     /**
      * builds message at dest for field fieldIdx
@@ -61,11 +67,14 @@ public:
 
     /**
      * builds a string as
-     *      dest[3-0] = timestamp
-     *      dest[5-4] = level
-     *      dest[7-6] = turb
-     *      dest[8]   = pluv
-     *      dest[9]   = usr
+     *      dest[3-0]   = timestamp
+     *      dest[5-4]   = level
+     *      dest[7-6]   = turb
+     *      dest[8]     = pluv
+     *      dest[9]     = usr
+     *      dest[13-10] = x
+     *      dest[17-14] = y
+     *      dest[21-18] = z
      * @returns the length of dest
      */
     int toString(char dest[]);

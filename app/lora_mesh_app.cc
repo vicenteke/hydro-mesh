@@ -49,7 +49,7 @@ OStream cout;
 
 // End Devices functions ---------------------------
 int read_sensor(char result[], Level_Sensor & level, Turbidity_Sensor & turb,
-                Pluviometric_Sensor & pluv, ED_Timer * timer) {
+                Pluviometric_Sensor & pluv, EndDevice_Lora_Mesh & lora) {
 
     MessagesHandler msg;
 
@@ -64,12 +64,15 @@ int read_sensor(char result[], Level_Sensor & level, Turbidity_Sensor & turb,
     msg.setLvl(1);
     msg.setTur(1);
     msg.setPlu(1);
-
     msg.setUsr(43); // ?
-    msg.setTime(timer->currentTime()); // Sends elapsed seconds since last read
 
     level.disable();
     turb.disable();
+
+    msg.setTime(lora.timer()->currentTime()); // Sends elapsed seconds since last read
+    msg.setX(lora.x());
+	msg.setY(lora.y());
+	msg.setZ(lora.z());
 
     msg.toString(result);
     msg.dump();
@@ -98,14 +101,15 @@ void main_func_ED() {
     auto pInput = GPIO{'B', 4, GPIO::IN};
     auto pluviometric = Pluviometric_Sensor{pInput, pToggle};
 
-    EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1);
+    // EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1);
+    EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1, 12345678, -76543210, 1020304);
     Interface interface(true);
     char buf[sizeof(DBEntry)];
 
     while(1) {
         Alarm::delay(7000000);
         cout << "ED ts: " << lora.timer()->currentTime() << endl;
-        read_sensor(buf, level, turbidity, pluviometric, lora.timer());
+        read_sensor(buf, level, turbidity, pluviometric, lora);
         lora.send(buf, sizeof(DBEntry));
         interface.show_life();
     }
@@ -162,23 +166,16 @@ void store_in_flash(int id, char data[]) {
     msg.setTime(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24));
 	msg.setLvl(data[4] | (data[5] << 8));
 	msg.setTur(data[6] | (data[7] << 8));
-	msg.setPlu(data[8]);
-	msg.setUsr(data[9]);
+	msg.setPlu((unsigned char) data[8]);
+	msg.setUsr((unsigned char) data[9]);
+	msg.setX(data[10] | (data[11] << 8) | (data[12] << 16) | (data[13] << 24));
+	msg.setY(data[14] | (data[15] << 8) | (data[16] << 16) | (data[17] << 24));
+	msg.setZ(data[18] | (data[19] << 8) | (data[20] << 16) | (data[21] << 24));
 	// msg.setPlu((unsigned char) data[8]);
 	// msg.setUsr((unsigned char) data[9]);
 
     send.send_or_store();
     // interface.blink_success(Interface::SUCCESS::MESSAGESENT);
-}
-
-void anotherPrint(int id, char data[]) {
-    unsigned long long ts = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24); // working
-    unsigned int lvl = data[4] | (data[5] << 8);
-    unsigned int turb = data[6] | (data[7] << 8);
-    unsigned short plu = data[8];
-    unsigned short usr = data[9];
-
-    cout << "ts: " << ts << " | " << lvl << " | " << turb << " | " << plu << " | " << usr << endl;
 }
 
 void main_func_GW() {

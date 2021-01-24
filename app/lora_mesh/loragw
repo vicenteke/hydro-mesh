@@ -313,15 +313,43 @@ class ReceiverThread(Thread):
 
             # time.sleep(0.8)
 
+def isJson(str):
+    try:
+        res = json.loads(str)
+    except ValueError as e:
+        return False
+    return True
+
+def createSeries(data):
+    # When to send credentials?
+    print("Sending... | ", data)
+    if True:
+        return b'S'
+    else:
+        return b'F'
+
 class GetTimeThread(Thread):
     def run(self):
         mote = init_mote()
         while True:
             try:
                 byte = mote.read(1)
-                if byte == b'@':
+                if byte == b'@': # Asking for timestamp
                     mote.close()
                     mote = init_mote()
+                elif byte == b'$': # Asking for series creation
+                    print("Creating series...")
+                    buf = ''
+                    byte = mote.read(1)
+                    while byte  != b'$':
+                        buf += byte # It should create a json string
+                        byte = mote.read(1)
+                    if not isJson(buf):
+                        mote.write(b'$') # Asks for data again
+                    else:
+                        mote.write(createSeries(buf)) # success b'S', fail b'F'
+                elif byte == b'%': # Asking for record insertion
+                    print("Inserting record...")
                 else:
                     print(byte.decode("utf-8"), end="")
 

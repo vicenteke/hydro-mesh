@@ -18,5 +18,6 @@
 #include "sender.h"
 //#include "thermocouple.h"
 //#include "batterymonitor.h"
+#include "smart.h"
 
 #endif

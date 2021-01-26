@@ -1,3 +1,9 @@
+/* TO DO
+ *
+ * Send series to create.
+ *      Use Series_Logger to control.
+ */
+
 #include <machine.h>
 #include <alarm.h>
 #include <gpio.h>
@@ -102,7 +108,7 @@ void main_func_ED() {
     auto pluviometric = Pluviometric_Sensor{pInput, pToggle};
 
     // EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1);
-    EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1, 12345678, -76543210, 1020304);
+    EndDevice_Lora_Mesh lora = EndDevice_Lora_Mesh(1, 37331860, -42829040, -28887290);
     Interface interface(true);
     char buf[sizeof(DBEntry)];
 
@@ -193,6 +199,8 @@ void main_func_GW() {
 
 	Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&store_in_flash);
 	// Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&anotherPrint);
+
+    Series_Logger series = Series_Logger();
 
     while (1) {
         Alarm::delay(2000000);

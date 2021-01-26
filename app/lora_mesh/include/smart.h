@@ -2,115 +2,21 @@
 #define _SMART_H
 
 #include "index.h"
-#include <smart_data.h>
+#include <utility/string.h>
 
 using namespace EPOS;
-
-enum {
-    MAX_NODES = 40
-};
-
-// Timeout variable
-TSC::Time_Stamp _init_timeout;
-const RTC::Microsecond SEND_DB_SERIES_TIMEOUT = 5ull * 60 * 1000000;
-const RTC::Microsecond SEND_DB_RECORD_TIMEOUT = 5ull * 60 * 1000000;
-
-// Test time
-// const RTC::Microsecond INTEREST_EXPIRY = 1ull * 60 * 1000000;
-// const RTC::Microsecond HTTP_SEND_PERIOD = 2ull * 60 * 1000000;
-// const RTC::Microsecond INTEREST_PERIOD = INTEREST_EXPIRY / 2;
-// const unsigned int HTTP_SEND_PERIOD_MULTIPLY = 1;//2 * 12;
-
-// Production time
-const RTC::Microsecond INTEREST_EXPIRY = 5ull * 60 * 1000000;
-const RTC::Microsecond HTTP_SEND_PERIOD = 30ull * 60 * 1000000;
-const RTC::Microsecond INTEREST_PERIOD = INTEREST_EXPIRY / 2;
-const unsigned int HTTP_SEND_PERIOD_MULTIPLY = 4;//2 * 12;
-
-typedef Smart_Data_Common::SI_Record DB_Record;
-typedef Smart_Data_Common::DB_Series DB_Series;
 
 // Credentials
 const char DOMAIN[]   = "tutorial";
 const char USERNAME[] = "tutorial";
 const char PASSWORD[] = "tuto2018";
 
-struct Credentials
-{
-    Credentials() {
-        _size_domain = sizeof(DOMAIN) - 1;
-        memcpy(_domain,DOMAIN,_size_domain);
-        _size_username = sizeof(USERNAME) - 1;
-        memcpy(_username,USERNAME,_size_username);
-        _size_password = sizeof(PASSWORD) - 1;
-        memcpy(_password,PASSWORD,_size_password);
-    }
-    char _size_domain;
-    char _domain[sizeof(DOMAIN) - 1];
-    char _size_username;
-    char _username[sizeof(USERNAME) - 1];
-    char _size_password;
-    char _password[sizeof(PASSWORD) - 1];
-}__attribute__((packed));
-
-struct Attach_Payload
-{
-    void credentials(Credentials credentials){ _credentials = credentials; }
-    void payload(DB_Series series){ _series = series; }
-public:
-    Credentials _credentials;
-    DB_Series _series;
-}__attribute__((packed));
-
-struct Put_Payload
-{
-    void credentials(Credentials credentials){ _credentials = credentials; }
-    void payload(DB_Record smartdata){ _smartdata = smartdata; }
-public:
-    Credentials _credentials;
-    DB_Record _smartdata;
-}__attribute__((packed));
-
-template<typename T>
-class Printer: public Smart_Data_Common::Observer
-{
-public:
-    Printer(T * t) : _data(t) {
-        _data->attach(this);
-        print(_data->db_series());
-    }
-    ~Printer() { _data->detach(this); }
-
-    void update(Smart_Data_Common::Observed * obs) {
-        print(_data->db_record());
-    }
-
-    template<typename D>
-    void print(const D & d)
-    {
-        bool was_locked = CPU::int_disabled();
-        if(!was_locked)
-            CPU::int_disable();
-        if(EQUAL<D, Smart_Data_Common::DB_Series>::Result)
-            io.put('S');
-        else
-            io.put('R');
-        for(unsigned int i = 0; i < sizeof(D); i++)
-            io.put(reinterpret_cast<const char *>(&d)[i]);
-        for(unsigned int i = 0; i < 3; i++)
-            io.put('X');
-        if(!was_locked)
-            CPU::int_enable();
-    }
-
-private:
-    T * _data;
-    USB io;
+enum {
+    MAX_NODES = 40
 };
 
 /*
- * Stores series already created based on received "Usr"
- * Obs: creating the series is up to the application
+ * Stores and creates series based on received "Usr"
  */
 class Series_Logger {
 public:
@@ -119,6 +25,8 @@ public:
         for (int i = 0; i < MAX_NODES; i++) {
             _log[i] = -1;
         }
+        sendCredentials();
+        Alarm::delay(400000);
     }
 
     ~Series_Logger() {}
@@ -154,7 +62,7 @@ public:
             }
         }
         if (found) {
-            _log[_length--] = -1
+            _log[_length--] = -1;
         }
 
         return found;
@@ -162,12 +70,52 @@ public:
 
     int length() { return _length; }
 
+    /*
+     * Sends credentials (the ones set in the beginning of this file) for loragw
+     *
+     * @return 0 if no credentials are available, 1 when sent
+     */
+    int sendCredentials() {
+        if (strlen(DOMAIN) < 2) return 0;
+        if (strlen(USERNAME) < 2) return 0;
+        if (strlen(PASSWORD) < 2) return 0;
+
+        char c = 0;
+        io.put('%');
+        do {
+            while (!io.ready_to_get());
+            c = io.get();
+        } while (c != '%');
+
+        for (int i = 0; i < strlen(DOMAIN); i++) {
+            io.put(DOMAIN[i]);
+        }
+        for (int i = 0; i < 3; i++) {
+            io.put('X');
+        }
+        for (int i = 0; i < strlen(USERNAME); i++) {
+            io.put(USERNAME[i]);
+        }
+        for (int i = 0; i < 3; i++) {
+            io.put('X');
+        }
+        for (int i = 0; i < strlen(PASSWORD); i++) {
+            io.put(PASSWORD[i]);
+        }
+        for (int i = 0; i < 3; i++) {
+            io.put('X');
+        }
+
+        return 1;
+    }
+
 private:
+    USB io;
     int _log[MAX_NODES];
     unsigned short _length;
 };
 
-class Smart_Data_Hydro_Mesh {
+/*class Smart_Data_Hydro_Mesh {
 public:
     Smart_Data_Hydro_Mesh() {
         level = new Water_level();
@@ -192,6 +140,6 @@ private:
     Water_Level * level;
     Water_Turbidity * turb;
     Rain * pluv;
-};
+};*/
 
 #endif

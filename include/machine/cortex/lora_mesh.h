@@ -208,6 +208,7 @@ public:
 
         // Initializing timer
         _timer = new GW_Timer();
+        Alarm::delay(500000);
 
         // Initializing interrupts
         _interrupt.handler(uartHandler, GPIO::FALLING);
@@ -342,7 +343,6 @@ private:
         char buf = '0';
         int id[] = {10, 10};
         int count = 0;
-        bool sequence = false;
         int i = 0;
 
         // Getting data
@@ -356,19 +356,10 @@ private:
             str[len++] = buf;
 
             // Verify end of message
-            if (sequence) {
-                if (buf == LORA_MESSAGE_FINAL) {
-                    count++;
-                    if (count == LORA_FINAL_COUNT) {
-                        len -= LORA_FINAL_COUNT;
-                    }
-                } else {
-                    count = 0;
-                    sequence = false;
-                }
-            } else if (buf == LORA_MESSAGE_FINAL) {
-                count = 1;
-                sequence = true;
+            if (buf == LORA_MESSAGE_FINAL) {
+                count++;
+            } else {
+                count = 0;
             }
 
             i = 0;
@@ -376,6 +367,7 @@ private:
             if (i >= LORA_TIMEOUT)
                 db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
         }
+        len -= LORA_FINAL_COUNT;
 
         str[len] = '\0';
 
@@ -432,40 +424,6 @@ public:
         // send(LORA_GET_NODES); // Tells gateway to list this node in net
         cout << "LoRa configured\n";
     }
-
-    /*EndDevice_Lora_Mesh(int id, Coordinates r = 0, void (*hand)(char *) = &printMessage) {
-
-        // hand: handler for messages from gateway. Receives message as parameter
-
-        cout << "Configuring LoRa...\n";
-        _id = id;
-        if (r) {
-            _x = r.x;
-            _y = r.y;
-            _z = rs.z;
-        } else {
-            _x = 0;
-            _y = 0;
-            _z = 0;
-        }
-
-        // Initializing interrupts
-        _interrupt.handler(uartHandler, GPIO::FALLING);
-        receiver(hand);
-
-        // Initializing timer
-        _timer = new ED_Timer();
-        cout << "Awaiting for timestamp from GW...\n";
-        while (_timer->epoch() == 0) {
-            send(LORA_SEND_TIMESTAMP);
-            Alarm::delay(6000000);
-        }
-
-        cout << "Timestamp received: " << _timer->epoch() << endl;
-
-        // send(LORA_GET_NODES); // Tells gateway to list this node in net
-        cout << "LoRa configured\n";
-    }*/
 
     ~EndDevice_Lora_Mesh() {
         db<Lora_Mesh>(WRN) << "~EndDevice() destructor called\n";
@@ -561,7 +519,6 @@ private:
         unsigned int len = 0;
         char buf = '0';
         int count = 0;
-        bool sequence = false;
         int i = 0;
 
         while (!_transparent.ready_to_get());
@@ -570,19 +527,10 @@ private:
             str[len++] = buf;
 
             // Verify end of message
-            if (sequence) {
-                if (buf == LORA_MESSAGE_FINAL) {
-                    count++;
-                    if (count == LORA_FINAL_COUNT) {
-                        len -= LORA_FINAL_COUNT;
-                    }
-                } else {
-                    count = 0;
-                    sequence = false;
-                }
-            } else if (buf == LORA_MESSAGE_FINAL) {
-                count = 1;
-                sequence = true;
+            if (buf == LORA_MESSAGE_FINAL) {
+                count++;
+            } else {
+                count = 0;
             }
 
             i = 0;
@@ -590,6 +538,8 @@ private:
             if (i >= LORA_TIMEOUT)
                 db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
         }
+
+        len -= LORA_FINAL_COUNT;
 
         str[len] = '\0';
 

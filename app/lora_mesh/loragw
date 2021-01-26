@@ -73,7 +73,7 @@ def init_mote():
     while not ok:
         try:
             # time.sleep(3)
-            print("Waiting for", DEV, "to appear")
+            # print("Waiting for", DEV, "to appear")
             while not os.path.exists(DEV) or not os.access(DEV, os.W_OK):
                 # print("Waiting for", DEV, "to appear")
                 # if os.path.exists(DEV):
@@ -289,27 +289,32 @@ class ReceiverThread(Thread):
             data = b''
             try:
                 db_x = mote.read(1)
-                while X < 3:
-                    byte = mote.read(1)
-                    data = data + byte
-                    if byte == b'X':
-                        X = X + 1
-                    else:
-                        X = 0
+                if db_x == b'@':
+                    mote.close()
+                    mote.init_mote()
+                else:
+                    while X < 3:
+                        byte = mote.read(1)
+                        data = data + byte
+                        if byte == b'X':
+                            X = X + 1
+                        else:
+                            X = 0
             except KeyboardInterrupt:
                 raise
             except Exception as e:
                 # print("Exception caught:", e, file=sys.stderr)
                 data = b''
 
-            if X == 3 and len(data):
-                data = data[:-X] # discard the X's at the end
+            if db_x != b'@':
+                if X == 3 and len(data):
+                    data = data[:-X] # discard the X's at the end
 
-            if not len(data):
-                mote.close()
-                mote = init_mote()
-            else:
-                to_be_parsed.put({'db_x' : db_x, 'data' : data})
+                if not len(data):
+                    mote.close()
+                    mote = init_mote()
+                else:
+                    to_be_parsed.put({'db_x' : db_x, 'data' : data})
 
             # time.sleep(0.8)
 
@@ -328,6 +333,45 @@ def createSeries(data):
     else:
         return b'F'
 
+def getCredentials(mote):
+    x = 0
+    entries = 0
+    data = b''
+    mote.write(b'%')
+    while entries < 3:
+        while x < 3:
+            byte = mote.read(1)
+            data += byte
+            if byte == b'X':
+                x += 1
+            else:
+                x = 0
+
+        data = data[:-x] # removes X's at the end
+        if entries == 0:
+            DOMAIN = data.decode("utf-8")
+        elif entries == 1:
+            USERNAME = data.decode("utf-8")
+        else:
+            PASSWORD = data.decode("utf-8")
+
+        entries += 1
+        x = 0
+        data = b''
+
+    if JSON:
+        CREDENTIALS = {}
+        CREDENTIALS['domain'] = DOMAIN
+        CREDENTIALS['username'] = USERNAME
+        CREDENTIALS['password'] = PASSWORD
+    else:
+        s_d = pack('<B', len(DOMAIN))
+        s_u = pack('<B', len(USERNAME))
+        s_p = pack('<B', len(PASSWORD))
+        CREDENTIALS = s_d+bytes(DOMAIN, 'utf-8')+s_u+bytes(USERNAME, 'utf-8')+s_p+bytes(PASSWORD, 'utf-8')
+
+    print("Credentials set: ", DOMAIN, " | ", USERNAME, " | ", PASSWORD, sep='')
+
 class GetTimeThread(Thread):
     def run(self):
         mote = init_mote()
@@ -337,18 +381,20 @@ class GetTimeThread(Thread):
                 if byte == b'@': # Asking for timestamp
                     mote.close()
                     mote = init_mote()
+                elif byte == b'%': # Able to send credentials
+                    getCredentials(mote)
                 elif byte == b'$': # Asking for series creation
                     print("Creating series...")
                     buf = ''
                     byte = mote.read(1)
-                    while byte  != b'$':
+                    while byte != b'$':
                         buf += byte # It should create a json string
                         byte = mote.read(1)
                     if not isJson(buf):
                         mote.write(b'$') # Asks for data again
                     else:
                         mote.write(createSeries(buf)) # success b'S', fail b'F'
-                elif byte == b'%': # Asking for record insertion
+                elif byte == b'*': # Asking for record insertion
                     print("Inserting record...")
                 else:
                     print(byte.decode("utf-8"), end="")

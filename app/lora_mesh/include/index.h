@@ -11,6 +11,7 @@
 // #include <machine/cortex_m/emote3_gptm.h>
 // #include <flash.h>
 #include <persistent_storage.h>
+#include <utility/string.h>
 
 #include "defines.h"
 #include "interface.h"

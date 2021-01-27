@@ -55,7 +55,8 @@ OStream cout;
 
 // End Devices functions ---------------------------
 int read_sensor(char result[], Level_Sensor & level, Turbidity_Sensor & turb,
-                Pluviometric_Sensor & pluv, EndDevice_Lora_Mesh & lora) {
+                Pluviometric_Sensor & pluv, EndDevice_Lora_Mesh & lora)
+{
 
     MessagesHandler msg;
 
@@ -70,7 +71,7 @@ int read_sensor(char result[], Level_Sensor & level, Turbidity_Sensor & turb,
     msg.setLvl(1);
     msg.setTur(1);
     msg.setPlu(1);
-    msg.setUsr(43); // ?
+    msg.setUsr(lora.id());
 
     level.disable();
     turb.disable();
@@ -161,24 +162,14 @@ void store_in_flash(int id, char data[]) {
     MessagesHandler msg;
     Sender send(&interface, &msg);
 
-    // msg.setLvl(id);
-    // msg.setTur(id);
-    // msg.setPlu(id);
-    // msg.setUsr(id);
-    // msg.setTime(id);
-
-    // msg.setTime(TSTP::absolute(TSTP::now()) / 1000000);
-
     msg.setTime(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24));
 	msg.setLvl(data[4] | (data[5] << 8));
 	msg.setTur(data[6] | (data[7] << 8));
 	msg.setPlu((unsigned char) data[8]);
-	msg.setUsr((unsigned char) data[9]);
+	msg.setUsr(data[9]);
 	msg.setX(data[10] | (data[11] << 8) | (data[12] << 16) | (data[13] << 24));
 	msg.setY(data[14] | (data[15] << 8) | (data[16] << 16) | (data[17] << 24));
 	msg.setZ(data[18] | (data[19] << 8) | (data[20] << 16) | (data[21] << 24));
-	// msg.setPlu((unsigned char) data[8]);
-	// msg.setUsr((unsigned char) data[9]);
 
     send.send_or_store();
     // interface.blink_success(Interface::SUCCESS::MESSAGESENT);
@@ -200,7 +191,38 @@ void main_func_GW() {
 	Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&store_in_flash);
 	// Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&anotherPrint);
 
-    Series_Logger series = Series_Logger();
+    // Serial_Link serial = Serial_Link();
+    Alarm::delay(500000);
+
+    // DB_Series series_data;
+    // series_data.version = STATIC_VERSION;
+    // series_data.unit = TSTP::Unit::Length; // Water_Level
+    // series_data.x = 37331860;
+    // series_data.y = -42829040;
+    // series_data.z = -28887290;
+    // series_data.r = 10 * 100;
+    // series_data.t0 = 0;
+    // series_data.t1 = -1;
+    // series_data.dev = 1;
+
+    // sender.serial()->createSeries(series_data);
+    // sender.serial()->finishSeries(series_data);
+
+    // DB_Record record_data;
+    // record_data.version = STATIC_VERSION;
+    // record_data.unit = TSTP::Unit::Amount_of_Substance; // Err 400
+    // // record_data.unit = TSTP::Unit::Length; // Water_Level
+    // record_data.value = 2.2;
+    // record_data.error = 1;
+    // record_data.confidence = 3;
+    // record_data.x = 37331860;
+    // record_data.y = -42829040;
+    // record_data.z = -28887290;
+    // record_data.t = gateway.timer()->currentTime() * 1000;
+    // record_data.dev = 1;
+
+    // char res = sender.serial()->sendRecord(record_data);
+
 
     while (1) {
         Alarm::delay(2000000);

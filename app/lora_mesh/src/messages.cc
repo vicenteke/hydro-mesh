@@ -54,7 +54,7 @@ void MessagesHandler::dump()
 {
     OStream cout;
 
-    cout << "\nMESSAGE"<< endl;
+    cout << "\n--- message ---"<< endl;
     cout << "lvl " << (m_entry.lvl) << endl;
     cout << "tur " << (m_entry.tur) << endl;
     cout << "plu " << (m_entry.plu) << endl;

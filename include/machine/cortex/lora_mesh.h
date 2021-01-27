@@ -203,7 +203,7 @@ public:
 
     // hand: handler for messages. Receives ID and the message as parameters
 
-        cout << "Configuring LoRa...\n";
+        cout << "Configuring Lora...\n";
         _id = MASTER_ID;
 
         // Initializing timer
@@ -214,7 +214,7 @@ public:
         _interrupt.handler(uartHandler, GPIO::FALLING);
         receiver(hand);
 
-        cout << "LoRa configured\n";
+        cout << "Lora configured\n";
     }
 
     ~Gateway_Lora_Mesh() {
@@ -365,7 +365,7 @@ private:
             i = 0;
             while (count < LORA_FINAL_COUNT && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
             if (i >= LORA_TIMEOUT)
-                db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
+                db<Lora_Mesh> (ERR) << "-----> timeout achieved for next message\n";
         }
         len -= LORA_FINAL_COUNT;
 
@@ -401,7 +401,7 @@ public:
 
         // hand: handler for messages from gateway. Receives message as parameter
 
-        cout << "Configuring LoRa...\n";
+        cout << "Configuring Lora...\n";
         _id = id;
         _x = x;
         _y = y;
@@ -422,7 +422,7 @@ public:
         cout << "Timestamp received: " << _timer->epoch() << endl;
 
         // send(LORA_GET_NODES); // Tells gateway to list this node in net
-        cout << "LoRa configured\n";
+        cout << "Lora configured\n";
     }
 
     ~EndDevice_Lora_Mesh() {

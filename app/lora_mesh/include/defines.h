@@ -65,4 +65,13 @@
 #define SENDER_PERIOD  (MINUTE_IN_US * MINUTES)
 #define SENSORS_PERIOD (SENDER_PERIOD - 1000)
 
+#define HYDRO_RADIUS 10000;
+
+// Error and confidence for each sensor
+#define HYDRO_ERROR_LEVEL 2; // TODO
+#define HYDRO_CONF_LEVEL  2;
+#define HYDRO_ERROR_TURB  3;
+#define HYDRO_CONF_TURB   3;
+#define HYDRO_ERROR_PLU   4;
+#define HYDRO_CONF_PLU    4;
 #endif

@@ -115,6 +115,7 @@ def init_mote():
     return mote
 
 def series_to_json(data):
+    global CREDENTIALS
     offset = 0
     version, unit, x, y, z, r, t0, t1, dev = unpack_from('<BIiiiIQQL',data,offset)
     ret_obj = {
@@ -128,12 +129,21 @@ def series_to_json(data):
                 'r' : r,
                 't0' : t0,
                 't1' : t1,
-                'dev' : dev
+                'dev' : dev,
+                'workflow' : 0
             }
         }
 
     if CREDENTIALS:
         ret_obj['credentials'] = CREDENTIALS
+    else:
+        ret_obj['credentials'] = {
+            'domain'   : 'tutorial',
+            'username' : 'tutorial',
+            'password' : 'tuto20182'
+        }
+        print("Credentials set as tutorial")
+
     return json.dumps(ret_obj)
 
 def smartdata_to_json(data):
@@ -167,6 +177,34 @@ def smartdata_to_json(data):
                     'dev' : dev
                 }
     return ret_obj
+
+def finish_to_json(data):
+    global CREDENTIALS
+    offset = 0
+    version, unit, x, y, z, r, t0, t1, dev = unpack_from('<BIiiiIQQL',data,offset)
+    ret_obj = {
+            'series' :
+            {
+                'version' : version,
+                'unit' : unit,
+                'x' : x,
+                'y' : y,
+                'z' : z,
+                'r' : r,
+            }
+        }
+
+    if CREDENTIALS:
+        ret_obj['credentials'] = CREDENTIALS
+    else:
+        ret_obj['credentials'] = {
+            'domain'   : 'tutorial',
+            'username' : 'tutorial',
+            'password' : 'tuto20182'
+        }
+        print("Credentials set as tutorial")
+
+    return json.dumps(ret_obj)
 
 from threading import Thread
 from multiprocessing import JoinableQueue
@@ -325,15 +363,179 @@ def isJson(str):
         return False
     return True
 
-def createSeries(data):
-    # When to send credentials?
-    print("Sending... | ", data)
-    if True:
-        return b'S'
+def createSeries(mote):
+    x = 0
+    buf = b''
+    while x < 3:
+        byte = mote.read(1)
+        buf += byte
+        if byte == b'X':
+            x += 1
+        else:
+            x = 0
+
+    buf = buf[:-x]
+    mote.close()
+    data = series_to_json(buf)
+    
+    session = requests.Session()
+    if JSON:
+        session.headers = {'Content-type' : 'application/json'}
     else:
-        return b'F'
+        session.headers = {'Connection': 'close', 'Content-type' : 'application/octet-stream', 'Content-length' : 0}
+
+    # if MY_CERTIFICATE[0] != '.pem':
+    #     session.cert = MY_CERTIFICATE
+
+    if JSON:
+        payload = { 'smartdata' : [ ] }
+        if CREDENTIALS:
+            payload['credentials'] = CREDENTIALS
+    else:
+        if CREDENTIALS:
+            payload = CREDENTIALS
+        else:
+            payload = ""
+
+    try:
+        if ONLY_DEBUG:
+            print("Attach [] (", len(data), ") ", data, sep='')
+        else:
+            if not JSON:
+                session.headers['Content-length'] = str(len(data))
+                if CREDENTIALS:
+                    data = CREDENTIALS+data
+            response = session.post('https://iot.lisha.ufsc.br/api/attach.php', data)
+            print("Attach [", str(response.status_code), "] (", len(data), ") ", data, sep='')
+
+            mote.open()
+            if response.status_code == 204:
+                mote.write(b'S')
+            else:
+                mote.write(b'F')
+    except Exception as e:
+        print("Exception catched:", e)
+        # mote.close()
+
+def sendRecord(mote):
+    x = 0
+    buf = b''
+    while x < 3:
+        byte = mote.read(1)
+        buf += byte
+        if byte == b'X':
+            x += 1
+        else:
+            x = 0
+
+    buf = buf[:-x]
+    mote.close()
+    data = smartdata_to_json(buf)
+
+    session = requests.Session()
+    count = 0
+    try:
+        if JSON:
+            payload = { 'smartdata' : [ ] }
+            if CREDENTIALS:
+                payload['credentials'] = CREDENTIALS
+            else:
+                payload['credentials'] = {
+                    'domain'   : 'tutorial',
+                    'username' : 'tutorial',
+                    'password' : 'tuto20182'
+                }
+                print("Credentials set as tutorial")
+        else:
+            if CREDENTIALS:
+                payload = CREDENTIALS
+            else:
+                payload = ""
+
+        if JSON:
+            payload['smartdata'].append(data)
+        else:
+            payload = payload+data
+
+        count = count + 1
+
+        if SLICE_MNGR_URL != '' and JSON:
+            if(ONLY_DEBUG):
+                print("Put in Slice [] (", len(data), ") ", data, sep='')
+            else:
+                slice_mngr_data = json.dumps({ 'smartdata' : [ data ] })
+                response = session.post(SLICE_MNGR_URL, slice_mngr_data)
+                print("Put in Slice [", str(response.status_code), "] (", len(data), ") ", data, sep='')
+
+        if count >= BATCH:
+            if not JSON:
+                session.headers['Content-length'] = str(len(payload))
+            else:
+                payload = json.dumps(payload)
+
+            if ONLY_DEBUG:
+                print("Put [] (", len(payload), ") ", payload, sep='')
+            else:
+                response = session.post(URL, payload)
+                print("Put [", str(response.status_code), "] (", len(payload), ") ", payload, sep='')
+            count = 0
+
+        mote.open()
+        if not ONLY_DEBUG:
+            if response.status_code == 204:
+                mote.write(b'S')
+            else: 
+                mote.write(b'F')
+    # else:
+        # print("Invalid data: ", data, file=sys.stderr)
+    except Exception as e:
+        print("Exception catched:", e)
+
+def finishSeries(mote):
+    x = 0
+    buf = b''
+    while x < 3:
+        byte = mote.read(1)
+        buf += byte
+        if byte == b'X':
+            x += 1
+        else:
+            x = 0
+
+    buf = buf[:-x]
+    data = finish_to_json(buf)
+    
+    session = requests.Session()
+    if JSON:
+        session.headers = {'Content-type' : 'application/json'}
+    else:
+        session.headers = {'Connection': 'close', 'Content-type' : 'application/octet-stream', 'Content-length' : 0}
+
+    # if MY_CERTIFICATE[0] != '.pem':
+    #     session.cert = MY_CERTIFICATE
+
+    try:
+        if ONLY_DEBUG:
+            print("Finish [] (", len(data), ") ", data, sep='')
+        else:
+            if not JSON:
+                session.headers['Content-length'] = str(len(data))
+                if CREDENTIALS:
+                    data = CREDENTIALS+data
+            response = session.post('https://iot.lisha.ufsc.br/api/finish.php', data)
+            print("Finish [", str(response.status_code), "] (", len(data), ") ", data, sep='')
+
+            mote.open()
+            if response.status_code == 204:
+                mote.write(b'S')
+            else:
+                mote.write(b'F')
+                
+    except Exception as e:
+        print("Exception catched:", e)
 
 def getCredentials(mote):
+    global CREDENTIALS
     x = 0
     entries = 0
     data = b''
@@ -364,13 +566,12 @@ def getCredentials(mote):
         CREDENTIALS['domain'] = DOMAIN
         CREDENTIALS['username'] = USERNAME
         CREDENTIALS['password'] = PASSWORD
+        print("Credentials set: ", CREDENTIALS['domain'], " | ", CREDENTIALS['username'], " | ", CREDENTIALS['password'], sep='')
     else:
         s_d = pack('<B', len(DOMAIN))
         s_u = pack('<B', len(USERNAME))
         s_p = pack('<B', len(PASSWORD))
         CREDENTIALS = s_d+bytes(DOMAIN, 'utf-8')+s_u+bytes(USERNAME, 'utf-8')+s_p+bytes(PASSWORD, 'utf-8')
-
-    print("Credentials set: ", DOMAIN, " | ", USERNAME, " | ", PASSWORD, sep='')
 
 class GetTimeThread(Thread):
     def run(self):
@@ -383,19 +584,15 @@ class GetTimeThread(Thread):
                     mote = init_mote()
                 elif byte == b'%': # Able to send credentials
                     getCredentials(mote)
-                elif byte == b'$': # Asking for series creation
+                elif byte == b'S': # Asking for series creation
                     print("Creating series...")
-                    buf = ''
-                    byte = mote.read(1)
-                    while byte != b'$':
-                        buf += byte # It should create a json string
-                        byte = mote.read(1)
-                    if not isJson(buf):
-                        mote.write(b'$') # Asks for data again
-                    else:
-                        mote.write(createSeries(buf)) # success b'S', fail b'F'
-                elif byte == b'*': # Asking for record insertion
+                    createSeries(mote);
+                elif byte == b'R': # Asking for record insertion
                     print("Inserting record...")
+                    sendRecord(mote)
+                elif byte == b'F': # Asking for series termination
+                    print("Finishing series...")
+                    finishSeries(mote)
                 else:
                     print(byte.decode("utf-8"), end="")
 

@@ -10,11 +10,6 @@
 
 using namespace EPOS;
 
-
-
-
-
-
 class Sensor_Base {
 public:
     Sensor_Base(GPIO & relay):

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 import time, requests, json
 
-get_url ='https://iot.ufsc.br/api/get.php'
+get_url ='https://iot.lisha.ufsc.br/api/get.php'
 
 epoch = int(time.time() * 1000000)
 query = {
         'series' : {
             'version' : '1.1',
-            'unit'    : 2224179493, # equivalent to 0x84924925 = luminous intensity
+            'unit'    : 2224441636, # TSTP::Unit::Length
             'x'       : 37331860,
             'y'       : -42829040,
             'z'       : -28887290,
             'r'       : 10*100,
-            't0'      : epoch - (5*60*1000000),
-            'tf'      : epoch,
-            'dev'     : 0
+            't0'      : 0,
+            't1'      : epoch,
+            'dev'     : 1,
         },
         'credentials' : {
-        	'domain' : 'tutorial',
+        	'domain'   : 'tutorial',
             'username' : 'tutorial',
-            'password' : 'tuto2018'
+            'password' : 'tuto20182'
         }
     }
 session = requests.Session()
@@ -28,9 +28,9 @@ response = session.post(get_url, json.dumps(query))
 
 # print("Get [", str(response.status_code), "] (", len(query), ") ", query, sep='')
 if response.status_code == 200:
-	print(json.dumps(response.json(), indent=4, sort_keys=False))
+	print("200:", json.dumps(response.json(), indent=4, sort_keys=False))
 elif response.status_code == 400:
-    print("400: no series matching request")
+    print("400: bad formatting")
 elif response.status_code == 204:
     print("204: series successfully created")
 else:

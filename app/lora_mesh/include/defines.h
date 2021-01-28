@@ -12,7 +12,7 @@
 
 
 // Station ID
-#define HYDRO_STATION_ID "h_j3"
+#define HYDRO_STATION_ID "h_j3" // Must have 4 char
 //12 h_j1
 //19 h_j3
 //17 h_j5

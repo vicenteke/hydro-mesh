@@ -13,7 +13,7 @@ parser.add_argument('-d','--dev', help='EPOSMote III device descriptor file', de
 parser.add_argument('-t','--timeout', help='Timeout for reading from mote', default=600)
 parser.add_argument('-u','--url', help='Post URL', default='https://iot.lisha.ufsc.br/api/put.php')
 parser.add_argument('-a','--attach_url', help='Attach URL', default='https://iot.lisha.ufsc.br/api/attach.php')
-parser.add_argument('-j','--json', help='Use JSON API', action='store_true')
+parser.add_argument('-j','--json', help='Use JSON API', action='store_true', default=True)
 parser.add_argument('-D','--domain', help='Data domain', default='')
 parser.add_argument('-U','--username', help='Data domain username', default='')
 parser.add_argument('-P','--password', help='User password', default='')
@@ -269,6 +269,7 @@ class PublisherThread(Thread):
             try:
                 if db_x == b'S': # DB_Series
                     if ONLY_DEBUG:
+                        data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                         print("Attach [] (", len(data), ") ", data, sep='')
                     else:
                         if not JSON:
@@ -276,6 +277,7 @@ class PublisherThread(Thread):
                             if CREDENTIALS:
                                 data = CREDENTIALS+data
                         response = session.post(ATTACH_URL, data)
+                        data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                         print("Attach [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
                 elif db_x == b'R': # DB_Record
@@ -288,10 +290,12 @@ class PublisherThread(Thread):
 
                     if SLICE_MNGR_URL != '' and JSON:
                         if(ONLY_DEBUG):
+                            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                             print("Put in Slice [] (", len(data), ") ", data, sep='')
                         else:
                             slice_mngr_data = json.dumps({ 'smartdata' : [ data ] })
                             response = session.post(SLICE_MNGR_URL, slice_mngr_data)
+                            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                             print("Put in Slice [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
                     if count >= BATCH:
@@ -416,6 +420,7 @@ def createSeries(mote):
 
     try:
         if ONLY_DEBUG:
+            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Attach [] (", len(data), ") ", data, sep='')
             mote.open()
             mote.write(b'S')
@@ -425,6 +430,7 @@ def createSeries(mote):
                 if CREDENTIALS:
                     data = CREDENTIALS+data
             response = session.post(ATTACH_URL, data)
+            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Attach [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
             mote.open()
@@ -480,10 +486,12 @@ def sendRecord(mote):
 
         if SLICE_MNGR_URL != '' and JSON:
             if(ONLY_DEBUG):
+                data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                 print("Put in Slice [] (", len(data), ") ", data, sep='')
             else:
                 slice_mngr_data = json.dumps({ 'smartdata' : [ data ] })
                 response = session.post(SLICE_MNGR_URL, slice_mngr_data)
+                data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                 print("Put in Slice [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
         if count >= BATCH:
@@ -496,6 +504,7 @@ def sendRecord(mote):
                 print("Put [] (", len(payload), ") ", payload, sep='')
             else:
                 response = session.post(URL, payload)
+                data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                 print("Put [", str(response.status_code), "] (", len(payload), ") ", payload, sep='')
             count = 0
 
@@ -537,6 +546,7 @@ def finishSeries(mote):
 
     try:
         if ONLY_DEBUG:
+            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Finish [] (", len(data), ") ", data, sep='')
             mote.open()
             mote.write(b'S')
@@ -546,6 +556,7 @@ def finishSeries(mote):
                 if CREDENTIALS:
                     data = CREDENTIALS+data
             response = session.post('https://iot.lisha.ufsc.br/api/finish.php', data)
+            data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Finish [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
             mote.open()

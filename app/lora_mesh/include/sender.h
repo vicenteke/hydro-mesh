@@ -63,6 +63,11 @@ public:
 private:
     bool init_network();
     bool init_config();
+
+    /*
+     * @brief Sends a message received by try_sending_queue. Creates the series necessary
+     * @return False in case of error, true otherwise
+     */
     int send_data(char * msg, int size);
 
     /**

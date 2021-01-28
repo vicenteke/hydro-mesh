@@ -172,7 +172,7 @@ void store_in_flash(int id, char data[]) {
 	msg.setZ(data[18] | (data[19] << 8) | (data[20] << 16) | (data[21] << 24));
 
     send.send_or_store();
-    // interface.blink_success(Interface::SUCCESS::MESSAGESENT);
+    interface.blink_success(Interface::SUCCESS::MESSAGESENT);
 }
 
 void main_func_GW() {
@@ -228,8 +228,8 @@ void main_func_GW() {
         Alarm::delay(2000000);
         // gateway.sendToAll("GW on");
 
-        cout << "GW ts: " << gateway.timer()->currentTime() << '\n';
-        interface.show_life();
+        // cout << "GW ts: " << gateway.timer()->currentTime() << '\n';
+        // interface.show_life();
         Alarm::delay(4000000);
         // gateway.send(1, "hi");
 
@@ -239,7 +239,7 @@ void main_func_GW() {
 
 int main()
 {
-    main_func_GW();
+    main_func_ED();
     // Interface interface(true);
     // interface.show_life();
     //

@@ -16,12 +16,12 @@ Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
 
     // _gprs = new EPOS::eMote3_GPRS{*_pwrkey, *_status, *_uart};
     // _interface->print_message(Interface::MESSAGE::GPRSCREATED, _status->get());
-    if (!_initialized)
+    if (!_initialized) {
+        kout << "Unsent msgs: " << unsent_messages() << "\n";
         _serial = new Serial_Link();
+    }
 
     _initialized = true;
-
-    kout << "Unsent msgs: " << unsent_messages() << "\n";
 }
 
 
@@ -93,9 +93,8 @@ int Sender::send_data(char * msg, int size)
 
             // Checks if series for that device weren't created and creates them
             if (!(_serial->add((int)msg[offset + 9]))) {
-                Alarm::delay(50000);
                 kout << "\n    it seems that the series for this device has already been created.\n"
-                     << "    creating new ones, this should merge previous series or each data is separated in two\n\n";
+                     << "    creating new ones, this should merge previous series or each data is split in two\n\n";
             }
             DB_Series series_data;
             series_data.version = STATIC_VERSION;
@@ -109,7 +108,11 @@ int Sender::send_data(char * msg, int size)
 
             // Pluviometer
             series_data.unit = TSTP::Unit::Length;
-            _serial->createSeries(series_data);
+            if(_serial->createSeries(series_data) == 'F') {
+                kout << "!!!! > unable to create series. Operation aborted and data discarded\n";
+                _serial->remove((int)msg[offset + 9]);
+                return false;
+            }
 
             // Turbidity
             series_data.unit = TSTP::Unit::Amount_of_Substance;
@@ -120,9 +123,9 @@ int Sender::send_data(char * msg, int size)
             series_data.dev += 2047; // Used to differ pluvio and water series. 2047 = max id for LoRaMESH
             _serial->createSeries(series_data);
 
-            Alarm::delay(100000);
             if (_serial->sendRecord(record) != 'S') {
                 kout << "!!!! > failed to send record. Operation aborted and data discarded\n";
+                _serial->remove((int)msg[offset + 9]);
                 return false;
             } else {
                 kout << "    pluviometer sent...\n";
@@ -137,7 +140,6 @@ int Sender::send_data(char * msg, int size)
         record.error        = HYDRO_ERROR_TURB; // Set in lora_mesh/include/defines.h
         record.confidence   = HYDRO_CONF_TURB;
 
-        Alarm::delay(100000);
         if (_serial->sendRecord(record) != 'S') {
             kout << "!!!! > failed to send turbidity\n";
             return false;
@@ -152,7 +154,6 @@ int Sender::send_data(char * msg, int size)
         record.confidence   = HYDRO_CONF_LEVEL;
         record.dev          += 2047; // Used to differ pluvio and water series. 2047 = max id for LoRaMESH
 
-        Alarm::delay(100000);
         if (_serial->sendRecord(record) != 'S') {
             kout << "!!!! > failed to send water level\n";
             return false;
@@ -167,8 +168,7 @@ int Sender::send_data(char * msg, int size)
 void Sender::send_or_store()
 {
     EPOS::OStream x;
-    // x << "Sending data....\n";
-    x << "storing data...";
+    // x << "sending data....\n";
 
     // long unsigned int timestamp = 0;
     // timestamp = getCurrentTime();
@@ -240,8 +240,8 @@ void Sender::try_sending_queue()
                 y = buf[19] | (buf[20] << 8) | (buf[21] << 16) | (buf[22] << 24);
                 z = buf[23] | (buf[24] << 8) | (buf[25] << 16) | (buf[26] << 24);
 				cout << "name = " << name << " timestamp = " << t << " level = " << l
-                    << " tur = " << tur << " plu = " << p << " device = " << s
-                    << "coord = " << x << ", " << y << ", " << z << endl;
+                    << " tur = " << tur << " plu = " << p << " device = " << s;
+                cout << " coord = " << x << ", " << y << ", " << z << endl;
 			} else {
 				_fifo.peek((buf - (FLASH_PADDING * i)) + idOffset + i*(sizeof(DBEntry)+FLASH_PADDING), i); //plus 2 bytes due to the flash
 				int tmp = sizeof(DBEntry) * i + idOffset;
@@ -254,8 +254,8 @@ void Sender::try_sending_queue()
                 y = buf[tmp+14] | (buf[tmp+15] << 8) | (buf[tmp+16] << 16) | (buf[tmp+17] << 24);
                 z = buf[tmp+18] | (buf[tmp+19] << 8) | (buf[tmp+20] << 16) | (buf[tmp+21] << 24);
 
-				cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " device = " << s
-                << "coord = " << x << ", " << y << ", " << z  << endl;
+				cout << "timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " device = " << s;
+                cout << "coord = " << x << ", " << y << ", " << z  << endl;
 			}
 			/*cout << "\n%%%%%%%%%% Printing message before sending:\n";
 			char name[5];

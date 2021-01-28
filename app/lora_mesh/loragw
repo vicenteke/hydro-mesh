@@ -97,22 +97,46 @@ def init_mote():
             time.sleep(3)
 
     # print("Mote open", file=sys.stderr)
-    if(SETUP):
-        # ts = int(time.time() * 1000000)
-        ts = int(time.time()) # Sent in seconds
-        print(int(ts))
-        str_ts = bytearray(8)
-        pack_into('<Q', str_ts, 0, ts)
-        try:
-            mote.write(b'YYYX'+str_ts)
-            # print("epoch written", file=sys.stderr)
-        except KeyboardInterrupt:
-            raise
-        except serial.serialutil.SerialTimeoutException:
-            pass
+    # if(SETUP):
+    #     # ts = int(time.time() * 1000000)
+    #     ts = int(time.time()) # Sent in seconds
+    #     print(int(ts))
+    #     str_ts = bytearray(8)
+    #     pack_into('<Q', str_ts, 0, ts)
+    #     try:
+    #         mote.write(b'YYYX'+str_ts)
+    #         # print("epoch written", file=sys.stderr)
+    #     except KeyboardInterrupt:
+    #         raise
+    #     except serial.serialutil.SerialTimeoutException:
+    #         pass
 
     # print("init_mote() done", file=sys.stderr)
     return mote
+
+def sendTimestamp(mote):
+    ts = int(time.time()) # Sent in seconds
+    print(int(ts))
+    str_ts = bytearray(8)
+    pack_into('<Q', str_ts, 0, ts)
+    try:
+        mote.write(b'YYYX'+str_ts)
+        # print("epoch written", file=sys.stderr)
+    except KeyboardInterrupt:
+        raise
+    except serial.serialutil.SerialTimeoutException:
+        mote.close()
+        try:
+            mote.open()
+            mote.write(b'F')
+            mote.write(b'F')
+            mote.write(b'F')
+            mote.close()
+            print("ERROR: Unable to send timestamp for GW. Closing connection to eMote")
+        except KeyboardInterrupt:
+            raise
+        except serial.serialutil.SerialTimeoutException:
+            raise
 
 def series_to_json(data):
     global CREDENTIALS
@@ -356,13 +380,6 @@ class ReceiverThread(Thread):
 
             # time.sleep(0.8)
 
-def isJson(str):
-    try:
-        res = json.loads(str)
-    except ValueError as e:
-        return False
-    return True
-
 def createSeries(mote):
     x = 0
     buf = b''
@@ -400,12 +417,14 @@ def createSeries(mote):
     try:
         if ONLY_DEBUG:
             print("Attach [] (", len(data), ") ", data, sep='')
+            mote.open()
+            mote.write(b'S')
         else:
             if not JSON:
                 session.headers['Content-length'] = str(len(data))
                 if CREDENTIALS:
                     data = CREDENTIALS+data
-            response = session.post('https://iot.lisha.ufsc.br/api/attach.php', data)
+            response = session.post(ATTACH_URL, data)
             print("Attach [", str(response.status_code), "] (", len(data), ") ", data, sep='')
 
             mote.open()
@@ -486,6 +505,8 @@ def sendRecord(mote):
                 mote.write(b'S')
             else: 
                 mote.write(b'F')
+        else:
+            mote.write(b'S')
     # else:
         # print("Invalid data: ", data, file=sys.stderr)
     except Exception as e:
@@ -517,6 +538,8 @@ def finishSeries(mote):
     try:
         if ONLY_DEBUG:
             print("Finish [] (", len(data), ") ", data, sep='')
+            mote.open()
+            mote.write(b'S')
         else:
             if not JSON:
                 session.headers['Content-length'] = str(len(data))
@@ -580,15 +603,14 @@ class GetTimeThread(Thread):
             try:
                 byte = mote.read(1)
                 if byte == b'@': # Asking for timestamp
-                    mote.close()
-                    mote = init_mote()
+                    sendTimestamp(mote)
                 elif byte == b'%': # Able to send credentials
                     getCredentials(mote)
                 elif byte == b'S': # Asking for series creation
-                    print("Creating series...")
+                    # print("Creating series...")
                     createSeries(mote);
                 elif byte == b'R': # Asking for record insertion
-                    print("Inserting record...")
+                    # print("Inserting record...")
                     sendRecord(mote)
                 elif byte == b'F': # Asking for series termination
                     print("Finishing series...")

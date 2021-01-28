@@ -47,119 +47,7 @@ enum {
     MOBILE_VERSION = (1 << 4) + (2 << 0),
 };
 
-// typedef Smart_Data_Common::SI_Record DB_Record;
-// typedef Smart_Data_Common::DB_Series DB_Series;
-
 using namespace EPOS;
-
-// // Credentials
-// const char DOMAIN[]   = "tutorial";
-// const char USERNAME[] = "tutorial";
-// const char PASSWORD[] = "tuto2018";
-
-// enum {
-//     MAX_NODES = 40
-// };
-
-// /*
-//  * Stores and creates series based on received "Usr"
-//  */
-// class Series_Logger {
-// public:
-//     Series_Logger() {
-//         _length = 0;
-//         for (int i = 0; i < MAX_NODES; i++) {
-//             _log[i] = -1;
-//         }
-//         sendCredentials();
-//         Alarm::delay(400000);
-//     }
-
-//     ~Series_Logger() {}
-
-//     /*
-//      * Checks if series 'usr' has been created; if hasn't, stores 'usr' in _log
-//      *
-//      * @return false if 'usr' was already in _log, true if it was stored in _log
-//      */
-//     int add(int usr) {
-
-//         for (int i = 0; i < _length; i++) {
-//             if (usr == _log[i]) return false;
-//         }
-
-//         _log[_length++] = usr;
-//         return true;
-//     }
-
-//     /*
-//      * Removes 'usr' from _log
-//      *
-//      * @return false if 'usr' wasn't in _log, true if it was removed
-//      */
-//     int remove(int usr) {
-//         bool found = false;
-//         for (int i = 0; i < _length; i++) {
-//             if (found) {
-//                 _log[i] = _log[i + 1];
-//             } else if (usr == _log[i]) {
-//                 found = true;
-//                 _log[i] = _log[i + 1];
-//             }
-//         }
-//         if (found) {
-//             _log[_length--] = -1;
-//         }
-
-//         return found;
-//     }
-
-//     int length() { return _length; }
-
-//     /*
-//      * Sends credentials (the ones set in the beginning of this file) for loragw
-//      *
-//      * @return 0 if no credentials are available, 1 when sent
-//      */
-//     int sendCredentials() {
-//         if (strlen(DOMAIN) < 2) return 0;
-//         if (strlen(USERNAME) < 2) return 0;
-//         if (strlen(PASSWORD) < 2) return 0;
-
-//         char c = 0;
-//         io.put('%');
-//         do {
-//             while (!io.ready_to_get());
-//             c = io.get();
-//         } while (c != '%');
-
-//         for (int i = 0; i < strlen(DOMAIN); i++) {
-//             io.put(DOMAIN[i]);
-//         }
-//         for (int i = 0; i < 3; i++) {
-//             io.put('X');
-//         }
-//         for (int i = 0; i < strlen(USERNAME); i++) {
-//             io.put(USERNAME[i]);
-//         }
-//         for (int i = 0; i < 3; i++) {
-//             io.put('X');
-//         }
-//         for (int i = 0; i < strlen(PASSWORD); i++) {
-//             io.put(PASSWORD[i]);
-//         }
-//         for (int i = 0; i < 3; i++) {
-//             io.put('X');
-//         }
-
-//         return 1;
-//     }
-
-// private:
-//     USB io;
-//     int _log[MAX_NODES];
-//     unsigned short _length;
-// };
 
 // Credentials
 const char DOMAIN[]   = "tutorial";
@@ -264,10 +152,16 @@ public:
         if (strlen(PASSWORD) < 2) return 0;
 
         char c = 0;
+        int timeout = 1000000;
         io.put('%');
         do {
-            while (!io.ready_to_get());
-            c = io.get();
+            while (!io.ready_to_get() && timeout-- > 0);
+            if (timeout > 0)
+                c = io.get();
+            else {
+                io.put('%');
+                timeout = 1000000;
+            }
         } while (c != '%');
 
         for (unsigned int i = 0; i < strlen(DOMAIN); i++) {
@@ -294,10 +188,9 @@ public:
 
     /*
      * @brief Sends data to loragw to create a new series
-     * @return the char it receives from loragw ('S' = success, 'F' = fail) or 'E' if already there
+     * @return the char it receives from loragw ('S' = success, 'F' = fail)
      */
     char createSeries(DB_Series & db_series) {
-        if (!series.add((int)db_series.dev)) return'E';
         char* data = reinterpret_cast<char*>(&db_series);
         io.put('S');
         for (unsigned int i = 0; i < sizeof(DB_Series); i++)
@@ -308,6 +201,7 @@ public:
         {
             io.put('X');
         }
+        while (!io.ready_to_get());
         return io.get();
     }
 
@@ -328,6 +222,7 @@ public:
         {
             io.put('X');
         }
+        while (!io.ready_to_get());
         return io.get();
     }
 
@@ -346,6 +241,7 @@ public:
         {
             io.put('X');
         }
+        while (!io.ready_to_get());
         return io.get();
     }
 

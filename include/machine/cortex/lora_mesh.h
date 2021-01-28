@@ -84,11 +84,23 @@ public:
         unsigned long long epoch = 0;
         unsigned int bytes = 0;
         char c = 0;
+        int fail = 0;
+        int timeout = 1500000;
         io.put('@');
         do {
-            while(!io.ready_to_get());
-            c = io.get();
-        } while(c != 'X');
+            while(!io.ready_to_get() && timeout-- > 0);
+            if (timeout > 0)
+                c = io.get();
+            else {
+                io.put('@');
+                timeout = 1500000;
+            }
+
+            if (c == 'F') fail++;
+            else fail = 0;
+
+        } while(c != 'X' && fail < 3);
+        if (fail == 3) return;
         while(bytes < sizeof(unsigned long long)){
             while(!io.ready_to_get());
             c = io.get();
@@ -160,7 +172,7 @@ public:
     static const char LORA_SEND_TIMESTAMP = '#'; // Used by getNodesInNet()
 
     // Values
-    static const int LORA_TIMEOUT             = 100000;
+    static const int LORA_TIMEOUT             = 1000000;
     static const int LORA_MAX_NODES           = 15; // Used by GW to create _nodes
     static const int LORA_FINAL_COUNT         =  4; // Number of times LORA_MESSAGE_FINAL is repeated
     static const unsigned int LORA_MAX_LENGTH = 40; // Max length for message

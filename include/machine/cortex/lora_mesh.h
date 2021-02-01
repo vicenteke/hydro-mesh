@@ -79,6 +79,14 @@ public:
         delete _timer;
     }
 
+    unsigned long long count() { return _count; }
+    unsigned long long epoch() { return _epoch; }
+    unsigned long long currentTime() { return _count + _epoch;}
+
+    void epoch(unsigned long long epoch) { _epoch = epoch; }
+
+private:
+    
     void getEpoch() {
         // Gets epoch from PC (loragw script should be running)
         unsigned long long epoch = 0;
@@ -110,10 +118,6 @@ public:
         _epoch = epoch;
         _count = 0;
     }
-
-    unsigned long long count() { return _count; }
-    unsigned long long epoch() { return _epoch; }
-    unsigned long long currentTime() { return _count + _epoch;}
 
 private:
 
@@ -376,8 +380,13 @@ private:
 
             i = 0;
             while (count < LORA_FINAL_COUNT && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
-            if (i >= LORA_TIMEOUT)
-                db<Lora_Mesh> (ERR) << "-----> timeout achieved for next message\n";
+            if (i >= LORA_TIMEOUT) {
+                db<Lora_Mesh> (ERR) << "-----> timeout achieved for message: discarding\n";
+                _transparent.clear_int();
+                _interrupt.int_enable();
+                _mutex.unlock();
+                return;
+            }
         }
         len -= LORA_FINAL_COUNT;
 
@@ -547,8 +556,13 @@ private:
 
             i = 0;
             while (count < LORA_FINAL_COUNT && !_transparent.ready_to_get() && i++ < LORA_TIMEOUT);
-            if (i >= LORA_TIMEOUT)
-                db<Lora_Mesh> (ERR) << "-----> TIMEOUT achieved for next message\n";
+            if (i >= LORA_TIMEOUT) {
+                db<Lora_Mesh> (ERR) << "-----> timeout achieved for message: discarding\n";
+                _transparent.clear_int();
+                _interrupt.int_enable();
+                _mutex.unlock();
+                return;
+            }
         }
 
         len -= LORA_FINAL_COUNT;

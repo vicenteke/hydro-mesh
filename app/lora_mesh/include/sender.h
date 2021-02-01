@@ -59,6 +59,7 @@ public:
     static int signal_strength(){ return _signal_str; }
 
     Serial_Link* serial() { return _serial; }
+    unsigned long long getTimestamp() { return _serial->getTimestamp(); }
 
 private:
     bool init_network();

@@ -5,6 +5,7 @@
 #include <utility/string.h>
 // #include <machine/cortex_m/emote3_flash.h>
 #include <persistent_storage.h>
+#include <mutex.h>
 __BEGIN_SYS
 
 /**
@@ -102,11 +103,13 @@ public:
 
         int slot = (m_head.pos + m_head.s) % CAPACITY;
 		//kout << "[FLASH IS WRITING to " << get_slot_addr(slot) << " ] timestamp = " << t << " level = " << l << " tur = " << tur << " plu = " << p << " signal = " << s << endl;
+        _mutex.lock();
         Flash::write(get_slot_addr(slot), static_cast<unsigned int*>(src), S);
 
         m_head.s++;
 
         flushHeader();
+        _mutex.unlock();
         return true;
     }
 
@@ -120,7 +123,9 @@ public:
 
         int slot = (m_head.pos + advance) % CAPACITY;
 		//kout << "Reading from flash address = " << get_slot_addr(slot) << endl;
+        _mutex.lock();
         Flash::read(get_slot_addr(slot), static_cast<unsigned int*>(dest), S);
+        _mutex.unlock();
 
 		/*char *buf = (char *) dest;
 		unsigned int t = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
@@ -145,8 +150,9 @@ public:
 
         m_head.pos = (m_head.pos + 1) % CAPACITY;
         m_head.s --;
-
+        _mutex.lock();
         flushHeader();
+        _mutex.unlock();
         return true;
     }
 
@@ -173,6 +179,7 @@ private:
         Flash::write(FLASH_BASE, reinterpret_cast<unsigned int*>(&m_head), HEADER_SIZE); // writes header to flash
     }
 
+    Mutex _mutex;
     Header m_head;
 };
 

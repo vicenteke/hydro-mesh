@@ -17,9 +17,9 @@ Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
     // _gprs = new EPOS::eMote3_GPRS{*_pwrkey, *_status, *_uart};
     // _interface->print_message(Interface::MESSAGE::GPRSCREATED, _status->get());
     if (!_initialized) {
+        _serial = new Serial_Link();
         kout << "Messages already in flash: " << unsent_messages() << "\n";
         // while(unsent_messages() > 0) _fifo.pop();
-        _serial = new Serial_Link();
     }
 
     _initialized = true;

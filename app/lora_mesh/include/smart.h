@@ -1,10 +1,11 @@
 #ifndef _SMART_H
 #define _SMART_H
 
-#include "index.h"
+// #include "index.h"
 // #include <smart_data.h> // Smart_Data not even compiling
 
 #include <tstp.h>
+#include <mutex.h>
 
 struct DB_Series {
     unsigned char version;
@@ -16,10 +17,10 @@ struct DB_Series {
     unsigned long long t0;
     unsigned long long t1;
     unsigned long dev;
-    friend OStream & operator<<(OStream & os, const DB_Series & d) {
-        os << "{ve=" << d.version << ",u=" << d.unit << ",dst=(" << d.x << "," << d.y << "," << d.z << ")+" << d.r << ",t=[" << d.t0 << "," << d.t1 << "]}";
-        return os;
-    }
+    // friend OStream & operator<<(OStream & os, const DB_Series & d) {
+    //     os << "{ve=" << d.version << ",u=" << d.unit << ",dst=(" << d.x << "," << d.y << "," << d.z << ")+" << d.r << ",t=[" << d.t0 << "," << d.t1 << "]}";
+    //     return os;
+    // }
 }__attribute__((packed));
 
 struct DB_Record {
@@ -133,14 +134,24 @@ public:
      *
      * @return false if 'usr' was already in _log, true if it was stored in _log
      */
-    bool add(int usr) { return series.add(usr); }
+    bool add(int usr) {
+        _mutex.lock();
+        bool res = series.add(usr);
+        _mutex.unlock();
+        return res;
+    }
 
     /*
      * Removes 'usr' from _log
      *
      * @return false if 'usr' wasn't in _log, true if it was removed
      */
-    bool remove(int usr) { return series.remove(usr); }
+    bool remove(int usr) {
+        _mutex.lock();
+        bool res = series.remove(usr);
+        _mutex.unlock();
+        return res;
+    }
 
     /*
      * @brief Sends credentials (the ones set in the beginning of this file) for loragw
@@ -153,6 +164,7 @@ public:
 
         char c = 0;
         int timeout = 1000000;
+        _mutex.lock();
         io.put('%');
         do {
             while (!io.ready_to_get() && timeout-- > 0);
@@ -182,6 +194,7 @@ public:
         for (int i = 0; i < 3; i++) {
             io.put('X');
         }
+        _mutex.unlock();
 
         return 1;
     }
@@ -192,6 +205,7 @@ public:
      */
     char createSeries(DB_Series & db_series) {
         char* data = reinterpret_cast<char*>(&db_series);
+        _mutex.lock();
         io.put('S');
         for (unsigned int i = 0; i < sizeof(DB_Series); i++)
         {
@@ -202,7 +216,9 @@ public:
             io.put('X');
         }
         while (!io.ready_to_get());
-        return io.get();
+        char res = io.get();
+        _mutex.unlock();
+        return res;
     }
 
     /*
@@ -213,6 +229,7 @@ public:
     char finishSeries(DB_Series & db_series) {
         // if (!series.remove((int)db_series.dev)) return;
         char* data = reinterpret_cast<char*>(&db_series);
+        _mutex.lock();
         io.put('F');
         for (unsigned int i = 0; i < sizeof(DB_Series); i++)
         {
@@ -223,7 +240,9 @@ public:
             io.put('X');
         }
         while (!io.ready_to_get());
-        return io.get();
+        char res = io.get();
+        _mutex.unlock();
+        return res;
     }
 
     /*
@@ -232,6 +251,7 @@ public:
      */
     char sendRecord(DB_Record & db_record) {
         char* data = reinterpret_cast<char*>(&db_record);
+        _mutex.lock();
         io.put('R');
         for (unsigned int i = 0; i < sizeof(DB_Record); i++)
         {
@@ -242,39 +262,51 @@ public:
             io.put('X');
         }
         while (!io.ready_to_get());
-        return io.get();
+        char res = io.get();
+        _mutex.unlock();
+        return res;
+    }
+
+    /*
+     * @brief Asks loragw for current timestamp
+     * @return current timestamp or 0 in case of error
+     */
+    unsigned long long getTimestamp() {
+        unsigned long long epoch = 0;
+        unsigned int bytes = 0;
+        char c = 0;
+        int fail = 0;
+        int timeout = 1500000;
+        _mutex.lock();
+        io.put('@');
+        do {
+            while(!io.ready_to_get() && timeout-- > 0);
+            if (timeout > 0)
+                c = io.get();
+            else {
+                io.put('@');
+                timeout = 1500000;
+            }
+
+            if (c == 'F') fail++;
+            else fail = 0;
+
+        } while(c != 'X' && fail < 3);
+        if (fail == 3) return 0;
+        while(bytes < sizeof(unsigned long long)){
+            while(!io.ready_to_get());
+            c = io.get();
+            epoch |= (static_cast<unsigned long long>(c) << ((bytes++)*8));
+        }
+
+        _mutex.unlock();
+        return epoch;
     }
 
 private:
     USB io;
     Series_Logger series;
+    static Mutex _mutex;
 };
-
-/*class Smart_Data_Hydro_Mesh {
-public:
-    Smart_Data_Hydro_Mesh() {
-        level = new Water_level();
-        turb  = new Water_Turbidity();
-        pluv  = new Rain();
-    }
-
-    ~Smart_Data_Hydro_Mesh {
-        delete level;
-        delete turb;
-        delete pluv;
-    }
-
-    Water_Level * level() { return level; };
-    Water_Turbidity * turbidity() { return turb; }
-    Rain * pluviometry() { return pluv; }
-
-private:
-    // My_Temperature t(0, 1500000, My_Temperature::PRIVATE, 5000000); // dev=0, expiry=15s, mode=PRIVATE, period=5s
-    // Printer<My_Temperature> p(&t);
-
-    Water_Level * level;
-    Water_Turbidity * turb;
-    Rain * pluv;
-};*/
 
 #endif

@@ -76,12 +76,14 @@ void main_func_ED() {
     Interface interface(true);
     char buf[sizeof(DBEntry)];
 
+    Alarm::delay(2000000);
     while(1) {
-        Alarm::delay(20000000);
-        // cout << "ED ts: " << lora.timer()->currentTime() << endl;
         read_sensor(buf, level, turbidity, pluviometric, lora);
         lora.send(buf, sizeof(DBEntry));
         interface.show_life();
+        Alarm::delay(10000000);
+        cout << "ED ts: " << lora.timer()->currentTime() << endl;
+        Alarm::delay(10000000);
     }
 }
 
@@ -118,8 +120,8 @@ void main_func_GW() {
     Sender sender(&interface, &msg);
     sender.init();
 
-	Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&store_in_flash);
-	// Gateway_Lora_Mesh gateway = Gateway_Lora_Mesh(&anotherPrint);
+	Gateway_Lora_Mesh lora = Gateway_Lora_Mesh(&store_in_flash);
+	// Gateway_Lora_Mesh lora = Gateway_Lora_Mesh(&anotherPrint);
 
     // Serial_Link serial = Serial_Link();
     Alarm::delay(500000);
@@ -148,7 +150,7 @@ void main_func_GW() {
     // record_data.x = 37331860;
     // record_data.y = -42829040;
     // record_data.z = -28887290;
-    // record_data.t = gateway.timer()->currentTime() * 1000;
+    // record_data.t = lora.timer()->currentTime() * 1000;
     // record_data.dev = 1;
 
     // char res = sender.serial()->sendRecord(record_data);
@@ -156,12 +158,15 @@ void main_func_GW() {
 
     while (1) {
         Alarm::delay(2000000);
-        // gateway.sendToAll("GW on");
+        // lora.sendToAll("GW on");
 
-        // cout << "GW ts: " << gateway.timer()->currentTime() << '\n';
-        // interface.show_life();
+        interface.show_life();
+        cout << "GW ts: " << lora.timer()->currentTime() << '\n';
+        cout << "Real ts: ";
+        sender.getTimestamp();
+        cout << '\n';
         Alarm::delay(4000000);
-        // gateway.send(1, "hi");
+        // lora.send(1, "hi");
 
         sender.try_sending_queue();
     }

@@ -6,6 +6,8 @@
 // #include <machine/cortex_m/emote3_flash.h>
 #include <persistent_storage.h>
 #include <mutex.h>
+#include <alarm.h>
+
 __BEGIN_SYS
 
 /**

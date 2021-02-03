@@ -10,6 +10,8 @@
 #include <lora_mesh.h>
 #include "lora_mesh/include/index.h"
 
+// #include <thread.h>
+
 // #include <tstp.h>
 
 using namespace EPOS;
@@ -88,7 +90,7 @@ void main_func_ED() {
 }
 
 // Gateway functions -------------------------------
-void store_in_flash(int id, char data[]) {
+int store_in_flash(int id, char data[]) {
 
     Interface interface(true);
     MessagesHandler msg;
@@ -105,6 +107,18 @@ void store_in_flash(int id, char data[]) {
 
     send.send_or_store();
     interface.blink_success(Interface::SUCCESS::MESSAGESENT);
+    return 0;
+}
+
+int flash_to_smart(Sender * sender) {
+    while(1) {
+        Alarm::delay(7000000);
+        cout << "real ts: ";
+        sender->getTimestamp();
+        Alarm::delay(500000);
+        sender->try_sending_queue();
+    }
+    return 0;
 }
 
 void main_func_GW() {
@@ -121,10 +135,12 @@ void main_func_GW() {
     sender.init();
 
 	Gateway_Lora_Mesh lora = Gateway_Lora_Mesh(&store_in_flash);
-	// Gateway_Lora_Mesh lora = Gateway_Lora_Mesh(&anotherPrint);
+	// Gateway_Lora_Mesh lora = Gateway_Lora_Mesh();
+
+    // Thread flash_smart_t = Thread(&flash_to_smart, &sender);
 
     // Serial_Link serial = Serial_Link();
-    Alarm::delay(500000);
+    // Alarm::delay(500000);
 
     // DB_Series series_data;
     // series_data.version = STATIC_VERSION;
@@ -155,26 +171,29 @@ void main_func_GW() {
 
     // char res = sender.serial()->sendRecord(record_data);
 
-
     while (1) {
-        Alarm::delay(2000000);
-        // lora.sendToAll("GW on");
+        for (int i = 0; i < 60 * 10; ++i) { // 60 * 10 * ~6 = update TS every +/- 1 hour
+            Alarm::delay(6000000);
+            // lora.sendToAll("GW on");
 
-        interface.show_life();
-        cout << "GW ts: " << lora.timer()->currentTime() << '\n';
-        cout << "Real ts: ";
-        sender.getTimestamp();
-        cout << '\n';
-        Alarm::delay(4000000);
-        // lora.send(1, "hi");
+            interface.show_life();
+            cout << "GW ts: " << lora.timer()->currentTime() << '\n';
+            cout << "real ts: ";
+            sender.getTimestamp();
+            Alarm::delay(4000000);
+            // lora.send(1, "hi");
 
-        sender.try_sending_queue();
+            lora.cleanThreads();
+            sender.try_sending_queue();
+        }
+        lora.timer()->epoch(sender.getTimestamp());
+        lora.sendTimestamp(Lora_Mesh::BROADCAST_ID);
     }
 }
 
 int main()
 {
-    main_func_ED();
+    main_func_GW();
 
     return 0;
 }

@@ -292,7 +292,10 @@ public:
             else fail = 0;
 
         } while(c != 'X' && fail < 3);
-        if (fail == 3) return 0;
+        if (fail == 3) {
+            _mutex.unlock();
+            return 0;
+        }
         while(bytes < sizeof(unsigned long long)){
             while(!io.ready_to_get());
             c = io.get();

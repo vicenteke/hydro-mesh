@@ -33,18 +33,19 @@ unsigned long long ED_Timer::_count;
 GPIO Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
 OStream Lora_Mesh::cout;
 UART Lora_Mesh::_transparent;
-Mutex Lora_Mesh::_mutex = Mutex();
+// Mutex Lora_Mesh::_mutex = Mutex();
 int Lora_Mesh::_id;
+Thread* Lora_Mesh::handler_t[5] = {0,0,0,0,0};
 
 // Gateway_Lora_Mesh static members
 // GPIO Gateway_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
-void (*Gateway_Lora_Mesh::_handler)(int, char *);
+int (*Gateway_Lora_Mesh::_handler)(int, char *);
 GW_Timer* Gateway_Lora_Mesh::_timer;
 // Gateway_Lora_Mesh::nodes_t Gateway_Lora_Mesh::_nodes;
 
 // EndDevice_Lora_Mesh static members
 // GPIO EndDevice_Lora_Mesh::_interrupt('C', LORA_RX_PIN, GPIO::IN);
-void (*EndDevice_Lora_Mesh::_handler)(char *);
+int (*EndDevice_Lora_Mesh::_handler)(char *);
 ED_Timer* EndDevice_Lora_Mesh::_timer;
 
 __END_SYS

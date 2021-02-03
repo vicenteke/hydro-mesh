@@ -54,10 +54,10 @@
 #include <utility/ostream.h>
 #include <uart.h>
 #include <gpio.h>
-#include <mutex.h>
 #include <lora_mesh.h>
 #include <timer.h>
 #include <tstp.h>
+#include <thread.h>
 
 __BEGIN_SYS
 
@@ -204,18 +204,18 @@ public:
 
 protected:
 
-    static int _id;			   // device's ID
-    static UART _transparent;  // transparent UART (C5/C6): send/receive data
+    static int _id;			      // device's ID
+    static UART _transparent;     // transparent UART (C5/C6): send/receive data
     static GPIO _interrupt;
     static OStream cout;
-    static Mutex _mutex;       // Guarantees that the LoRa module is on
+    static Thread * handler_t[5]; // stores threads created to handle messages
 };
 
 class Gateway_Lora_Mesh : public Lora_Mesh {
 
 public:
 
-    Gateway_Lora_Mesh(void (*hand)(int, char *) = &printMessage) {
+    Gateway_Lora_Mesh(int (*hand)(int, char *) = &printMessage) {
 
     // hand: handler for messages. Receives ID and the message as parameters
 
@@ -247,8 +247,6 @@ public:
         if (len <= 0)
             len = strlen(data);
 
-        // if(!_isOn) turnOn();
-        _mutex.lock();
     	_transparent.put(id & 0xFF);
     	_transparent.put((id >> 8) & 0xFF);
 
@@ -259,7 +257,6 @@ public:
         for (int i = 0; i < LORA_FINAL_COUNT; i++) {
             _transparent.put(LORA_MESSAGE_FINAL);
         }
-        _mutex.unlock();
     }
 
     static void send(int id, char c) {
@@ -267,17 +264,12 @@ public:
 
         db<Lora_Mesh> (INF) << "Gateway_Lora_Mesh::send(char) called\n";
 
-        // if(!_isOn) turnOn();
-        _mutex.lock();
-
     	_transparent.put(id & 0xFF);
     	_transparent.put((id >> 8) & 0xFF);
         _transparent.put(c);
         for (int i = 0; i < LORA_FINAL_COUNT; i++) {
             _transparent.put(LORA_MESSAGE_FINAL);
         }
-
-        _mutex.unlock();
     }
 
     void sendToAll(char* data, int len = 0) {
@@ -307,7 +299,7 @@ public:
         }
     }
 
-    void receiver(void (*handler)(int, char *) = 0) {
+    void receiver(int (*handler)(int, char *) = 0) {
     // Starts receiving messages: enables interrupts for UART
     // handler: handler for messages. Receives ID and the message as parameters
 
@@ -331,25 +323,43 @@ public:
         _interrupt.int_disable();
     }
 
-    static void printMessage(int id, char * msg) {
+    static int printMessage(int id, char * msg) {
     // Default handler for messages
 
     // Notice that any function(int, char *) can be passed to constructor to be
     // the handler. Ex: Gateway_Lora_Mesh(&function)
         OStream kout;
         kout << "Received from " << id << ": " << msg << '\n';
+        return 0;
     }
 
     GW_Timer* timer() { return _timer; }
 
+    static void cleanThreads() {
+        for (int i = 0; i < 5; ++i)
+            if (handler_t[i] && handler_t[i]->state() == Thread::State::FINISHING) {
+                delete handler_t[i];
+                handler_t[i] = 0;
+            }
+    }
+
 private:
+
+    static bool createThread(int (*hand)(int, char *), int id, char data[]) {
+        for (int i = 0; i < 5; ++i) {
+            if (!handler_t[i]) {
+                handler_t[i] = new Thread(hand, id, data);
+                return true;
+            }
+        }
+        return false;
+    }
 
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
 
-        // db<Lora_Mesh>(WRN) << "[UART Handler] ";
+        // db<Lora_Mesh>(WRN) << "[uart handler] ";
 
-        _mutex.lock();
         _interrupt.int_disable();
 
         char str[LORA_MAX_LENGTH];
@@ -384,13 +394,13 @@ private:
                 db<Lora_Mesh> (ERR) << "-----> timeout achieved for message: discarding\n";
                 _transparent.clear_int();
                 _interrupt.int_enable();
-                _mutex.unlock();
                 return;
             }
         }
         len -= LORA_FINAL_COUNT;
 
         str[len] = '\0';
+        cleanThreads();
 
         // Looking for commands
         if (str[1] == '\0') {
@@ -399,26 +409,30 @@ private:
                     sendTimestamp((id[0] << 8) + id[1]);
                     break;
                 default:
-                    _handler(((id[0] << 8) + id[1]), str);
+                    if (!createThread(&(*_handler), ((id[0] << 8) + id[1]), str)) {
+                        db<Lora_Mesh> (ERR) << "-----> handler threads limit achieved: discarding\n";
+                    }
                     break;
             }
         } else
-            _handler(((id[0] << 8) + id[1]), str);
+            if (!createThread(&(*_handler), ((id[0] << 8) + id[1]), str)) {
+                db<Lora_Mesh> (ERR) << "-----> handler threads limit achieved: discarding\n";
+            }
+            // _handler(((id[0] << 8) + id[1]), str);
 
         _transparent.clear_int();
         _interrupt.int_enable();
-        _mutex.unlock();
     }
 
 private:
-    static void (*_handler)(int, char *);
+    static int (*_handler)(int, char *);
     static GW_Timer* _timer;
 };
 
 class EndDevice_Lora_Mesh : public Lora_Mesh {
 
 public:
-    EndDevice_Lora_Mesh(int id, int x = 0, int y = 0, int z = 0, void (*hand)(char *) = &printMessage) {
+    EndDevice_Lora_Mesh(int id, int x = 0, int y = 0, int z = 0, int (*hand)(char *) = &printMessage) {
 
         // hand: handler for messages from gateway. Receives message as parameter
 
@@ -437,7 +451,7 @@ public:
         cout << "Awaiting for timestamp from GW...\n";
         while (_timer->epoch() == 0) {
             send(LORA_SEND_TIMESTAMP);
-            Alarm::delay(6000000);
+            Alarm::delay(5000000);
         }
 
         cout << "Timestamp received: " << _timer->epoch() << endl;
@@ -460,9 +474,6 @@ public:
         if (len <= 0)
             len = strlen(data);
 
-        // if(!_isOn) turnOn();
-        _mutex.lock();
-
     	for (int i = 0 ; i < len ; i++) {
     		_transparent.put(data[i]);
     	}
@@ -470,8 +481,6 @@ public:
         for (int i = 0; i < LORA_FINAL_COUNT; i++) {
             _transparent.put(LORA_MESSAGE_FINAL);
         }
-
-        _mutex.unlock();
     }
 
     static void send(char c) {
@@ -479,18 +488,13 @@ public:
 
     	db<Lora_Mesh> (INF) << "EndDevice_Lora_Mesh::send(char) called\n";
 
-        // if(!_isOn) turnOn();
-        _mutex.lock();
-
 		_transparent.put(c);
         for (int i = 0; i < LORA_FINAL_COUNT; i++) {
             _transparent.put(LORA_MESSAGE_FINAL);
         }
-
-        _mutex.unlock();
     }
 
-    void receiver(void (*handler)(char *) = 0) {
+    void receiver(int (*handler)(char *) = 0) {
     // Starts receiving messages: enables interrupts for UART
 
         cout << "End Device " << id() << " started waiting for messages\n";
@@ -514,9 +518,11 @@ public:
         _interrupt.int_disable();
     }
 
-    static void printMessage(char * msg) {
+    static int printMessage(char * msg) {
         OStream kout;
         kout << "> " << msg << '\n';
+        Thread::exit();
+        return 0;
     }
 
     ED_Timer* timer() { return _timer; }
@@ -525,13 +531,31 @@ public:
     int y() { return _y; }
     int z() { return _z; }
 
+    static void cleanThreads() {
+        for (int i = 0; i < 5; ++i)
+            if (handler_t[i] && handler_t[i]->state() == Thread::State::FINISHING) {
+                delete handler_t[i];
+                handler_t[i] = 0;
+            }
+    }
+
 private:
+
+    static bool createThread(int (*hand)(char *), char data[]) {
+        for (int i = 0; i < 5; ++i) {
+            if (!handler_t[i]) {
+                handler_t[i] = new Thread(hand, data);
+                return true;
+            }
+        }
+        return false;
+    }
+
     static void uartHandler(const unsigned int &) {
     // Gets data from UART and passes it for _handler to deal with
 
-        // db<Lora_Mesh>(INF) << "[UART Handler] ";
+        // db<Lora_Mesh>(INF) << "[uart Handler] ";
 
-        _mutex.lock();
         _interrupt.int_disable();
 
         char str[LORA_MAX_LENGTH];
@@ -560,7 +584,6 @@ private:
                 db<Lora_Mesh> (ERR) << "-----> timeout achieved for message: discarding\n";
                 _transparent.clear_int();
                 _interrupt.int_enable();
-                _mutex.unlock();
                 return;
             }
         }
@@ -568,6 +591,7 @@ private:
         len -= LORA_FINAL_COUNT;
 
         str[len] = '\0';
+        cleanThreads();
 
         /*if (str[0] >= 0 && str[0] <= 9) {
             db<Lora_Mesh> (WRN) << "Received message intended to node " << (int)((str[0] << 8) + str[1]) << ":\n";
@@ -582,15 +606,16 @@ private:
             _timer->epoch(ts);
             _timer->reset();
         } else
-            _handler(str);
+            if(!createThread(&(*_handler), str)) {
+                db<Lora_Mesh> (ERR) << "-----> handler threads limit achieved: discarding\n";
+            }
 
         _transparent.clear_int();
         _interrupt.int_enable();
-        _mutex.unlock();
     }
 
 private:
-    static void (*_handler)(char *);
+    static int (*_handler)(char *);
     static ED_Timer* _timer;
 
     int _x, _y, _z;

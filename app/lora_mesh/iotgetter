@@ -7,14 +7,14 @@ epoch = int(time.time() * 1000000)
 query = {
         'series' : {
             'version' : '1.1',
-            'unit'    : 2224441636, # 2224441636 = TSTP::Unit::Length; 2224179500 = Amount_of_Substance
-            'x'       : 37335860, # 37331860
+            'unit'    : 2224179500, # 2224441636 = TSTP::Unit::Length; 2224179500 = Amount_of_Substance
+            'x'       : 37335860, # 37331860 e 37335860
             'y'       : -42829040,
             'z'       : -28887290,
             'r'       : 10*100,
             't0'      : 0,
             't1'      : epoch,
-            'dev'     : 2048, # + 2047 = water level
+            'dev'     : 1, # + 2047 = water level
         },
         'credentials' : {
         	'domain'   : 'tutorial',

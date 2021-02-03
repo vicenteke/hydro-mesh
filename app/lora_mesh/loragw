@@ -179,6 +179,7 @@ def smartdata_to_json(data):
         # SI Unit
         size_v = 8;
         value  = unpack("<d", data[offset:offset+size_v])[0]
+        # value  = unpack_from("<H", data, offset)
     else:
         # Digital Unit
         size_v = unit & 0xFFFF;
@@ -390,8 +391,8 @@ def createSeries(mote):
     while x < 3:
         byte = mote.read(1)
         if not byte: # timeout achieved, should just print 'S'
-                print('S', buf.decode("utf-8"), sep='')
-                return
+            print('S', buf.decode("utf-8"), " (series not created)", sep='')
+            return
         buf += byte
         if byte == b'X':
             x += 1
@@ -423,6 +424,7 @@ def createSeries(mote):
 
     try:
         if ONLY_DEBUG:
+            time.sleep(2)
             data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Attach [] (", len(data), ") ", data, sep='')
             mote.open()
@@ -451,8 +453,8 @@ def sendRecord(mote):
     while x < 3:
         byte = mote.read(1)
         if not byte: # timeout achieved, should just print 'R'
-                print('R', buf.decode("utf-8"), sep='')
-                return
+            print('R', buf.decode("utf-8"), " (record not sent)", sep='')
+            return
         buf += byte
         if byte == b'X':
             x += 1
@@ -492,6 +494,7 @@ def sendRecord(mote):
 
         if SLICE_MNGR_URL != '' and JSON:
             if(ONLY_DEBUG):
+                time.sleep(2)
                 data = json.dumps(json.loads(data), indent=4, sort_keys=False)
                 print("Put in Slice [] (", len(data), ") ", data, sep='')
             else:
@@ -507,10 +510,12 @@ def sendRecord(mote):
                 payload = json.dumps(payload)
 
             if ONLY_DEBUG:
+                time.sleep(2)
+                payload = json.dumps(json.loads(payload), indent=4, sort_keys=False)
                 print("Put [] (", len(payload), ") ", payload, sep='')
             else:
                 response = session.post(URL, payload)
-                data = json.dumps(json.loads(data), indent=4, sort_keys=False)
+                payload = json.dumps(json.loads(payload), indent=4, sort_keys=False)
                 print("Put [", str(response.status_code), "] (", len(payload), ") ", payload, sep='')
             count = 0
 
@@ -533,8 +538,8 @@ def finishSeries(mote):
     while x < 3:
         byte = mote.read(1)
         if not byte: # timeout achieved, should just print 'F'
-                print('F', buf.decode("utf-8"), sep='')
-                return
+            print('F', buf.decode("utf-8"), " (series not finished)", sep='')
+            return
         buf += byte
         if byte == b'X':
             x += 1
@@ -555,6 +560,7 @@ def finishSeries(mote):
 
     try:
         if ONLY_DEBUG:
+            time.sleep(2)
             data = json.dumps(json.loads(data), indent=4, sort_keys=False)
             print("Finish [] (", len(data), ") ", data, sep='')
             mote.open()
@@ -586,6 +592,9 @@ def getCredentials(mote):
     while entries < 3:
         while x < 3:
             byte = mote.read(1)
+            if not byte: # timeout achieved, should just print '@'
+                print('@', data.decode("utf-8"), " (credentials not set)", sep='')
+                return
             data += byte
             if byte == b'X':
                 x += 1
@@ -616,7 +625,7 @@ def getCredentials(mote):
         s_p = pack('<B', len(PASSWORD))
         CREDENTIALS = s_d+bytes(DOMAIN, 'utf-8')+s_u+bytes(USERNAME, 'utf-8')+s_p+bytes(PASSWORD, 'utf-8')
 
-class GetTimeThread(Thread):
+class LoraGWThread(Thread):
     def run(self):
         mote = init_mote()
         while True:
@@ -635,7 +644,7 @@ class GetTimeThread(Thread):
                 elif byte == b'F': # Asking for series termination
                     print("Finishing series...")
                     finishSeries(mote)
-                else:
+                elif byte:
                     print(byte.decode("utf-8"), end="")
 
             except KeyboardInterrupt:
@@ -646,4 +655,4 @@ if __name__ == "__main__":
 #     ParserThread().start()
 #     PublisherThread().start()
 
-    GetTimeThread().start()
+    LoraGWThread().start()

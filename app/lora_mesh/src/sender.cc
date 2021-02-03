@@ -19,7 +19,7 @@ Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
     if (!_initialized) {
         _serial = new Serial_Link();
         kout << "Messages already in flash: " << unsent_messages() << "\n";
-        // while(unsent_messages() > 0) _fifo.pop();
+        while(unsent_messages() > 0) _fifo.pop();
     }
 
     _initialized = true;
@@ -67,6 +67,8 @@ int Sender::send_data(char * msg, int size)
     // io.put('@');
     // if(!was_locked)
     //     CPU::int_enable();
+
+    // kout << "[send_data] ";
     int nameOffset = 5; // name[5]
     int offset = 0;
 
@@ -171,7 +173,7 @@ int Sender::send_data(char * msg, int size)
 void Sender::send_or_store()
 {
     EPOS::OStream x;
-    // x << "sending data....\n";
+    // x << "[send_or_store] ";
 
     // long unsigned int timestamp = 0;
     // timestamp = getCurrentTime();
@@ -215,7 +217,7 @@ void Sender::send_or_store()
 void Sender::try_sending_queue()
 {
 	EPOS::OStream cout;
-	// cout << "Sender::try_sending_queue()\n";
+	// cout << "[try_sending_queue] ";
     if( unsent_messages() >= SENDING_BATCH_SIZE ) {
 	    int idOffset = strlen(HYDRO_STATION_ID) + 1;
 	    int bufSize = SENDING_BATCH_SIZE_MAX*(sizeof(DBEntry) + FLASH_PADDING) + idOffset; //plus 2 bytes due to the flash
@@ -275,13 +277,13 @@ void Sender::try_sending_queue()
         // bool sent = send_data(buf, (toSend * (sizeof(DBEntry) + FLASH_PADDING) + idOffset) - (toSend * FLASH_PADDING));  //bufSize-(FLASH_PADDING*toSend)); //less 2 bytes due to flash
 
         if(sent) {
-            cout << "sent from fifo\n";
+            cout << "sent " << toSend << " from fifo\n";
             for(int i = 0; i < toSend; i++)
                 _fifo.pop();
         } else {
             cout << "sent failed from fifo\n";
-            for(int i = 0; i < toSend; i++)
-                _fifo.pop();
+            // for(int i = 0; i < toSend; i++)
+            //     _fifo.pop();
         }
     }
 }

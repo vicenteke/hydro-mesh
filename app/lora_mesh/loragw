@@ -178,8 +178,9 @@ def smartdata_to_json(data):
     if (unit >> 31) == 1:
         # SI Unit
         size_v = 8;
-        value  = unpack("<d", data[offset:offset+size_v])[0]
-        # value  = unpack_from("<H", data, offset)
+        val  = bytearray(data[offset:offset+size_v])
+        # value  = unpack("<d", data[offset:offset+size_v])[0]
+        value = unpack('<d', val[4:] + val[:4])[0]
     else:
         # Digital Unit
         size_v = unit & 0xFFFF;

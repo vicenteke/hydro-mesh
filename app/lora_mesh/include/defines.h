@@ -66,6 +66,7 @@
 #define SENSORS_PERIOD (SENDER_PERIOD - 1000)
 
 #define HYDRO_RADIUS 10000;
+#define HYDRO_RESOLUTION 1; //Used to set resolution of data to send (e.g. 100 = .01 resolution)
 
 // Error and confidence for each sensor
 #define HYDRO_ERROR_LEVEL 2; // TODO

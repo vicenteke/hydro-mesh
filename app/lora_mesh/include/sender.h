@@ -61,6 +61,14 @@ public:
     Serial_Link* serial() { return _serial; }
     unsigned long long getTimestamp() { return _serial->getTimestamp(); }
 
+    /**
+     * @brief Data has to be casted to double for DB_Record
+     * @returns Value casted and divided by HYDRO_RESOLUTION (defines.h)
+     */
+    double castValue(unsigned short val) {
+        return (double)val / HYDRO_RESOLUTION;
+    }
+
 private:
     bool init_network();
     bool init_config();

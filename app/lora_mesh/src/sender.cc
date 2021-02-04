@@ -19,7 +19,7 @@ Sender::Sender(Interface *x, MessagesHandler *m) : _interface(x), _msg(m)
     if (!_initialized) {
         _serial = new Serial_Link();
         kout << "Messages already in flash: " << unsent_messages() << "\n";
-        while(unsent_messages() > 0) _fifo.pop();
+        // while(unsent_messages() > 0) _fifo.pop();
     }
 
     _initialized = true;
@@ -87,7 +87,7 @@ int Sender::send_data(char * msg, int size)
 
         // Sending pluviometer
         record.unit         = TSTP::Unit::Length;
-        record.value        = msg[offset+6] | (msg[offset+7] << 8);
+        record.value        = castValue(msg[offset+6] | (msg[offset+7] << 8));
         record.error        = HYDRO_ERROR_PLU; // Set in lora_mesh/include/defines.h
         record.confidence   = HYDRO_CONF_PLU;
 
@@ -139,7 +139,7 @@ int Sender::send_data(char * msg, int size)
         
         // Sending turbidity
         record.unit         = TSTP::Unit::Amount_of_Substance;
-        record.value        = msg[offset] | (msg[offset+1] << 8) | (msg[offset+2] << 16) | (msg[offset+3] << 24);
+        record.value        = castValue(msg[offset+6] | (msg[offset+7] << 8));
         record.error        = HYDRO_ERROR_TURB; // Set in lora_mesh/include/defines.h
         record.confidence   = HYDRO_CONF_TURB;
 
@@ -152,7 +152,7 @@ int Sender::send_data(char * msg, int size)
 
         // Sending water level
         record.unit         = TSTP::Unit::Length;
-        record.value        = msg[offset+4] | (msg[offset+5] << 8);
+        record.value        = castValue(msg[offset+4] | (msg[offset+5] << 8));
         record.error        = HYDRO_ERROR_LEVEL; // Set in lora_mesh/include/defines.h
         record.confidence   = HYDRO_CONF_LEVEL;
         record.dev          += 2047; // Used to differ pluvio and water series. 2047 = max id for LoRaMESH
